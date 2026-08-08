@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* Self-hosted through npm, so no visitor request ever reaches Google Fonts. */
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/inter";
+
+/*
+  The CrAZy Dog People / AZ Pound Pups
+  Palette sampled from the TCDP logo's Arizona sunset gradient.
+
+  Color semantics, locked with Dee:
+    sunset = waiting / urgent      sage = safe with a rescue      gold = home
+*/
+
+@theme {
+  --color-ink: #111111;
+  --color-ink-soft: #3d3a35;
+  --color-cream: #fbf4e9;
+  --color-cream-deep: #f4e9d8;
+  --color-surface: #ffffff;
+  --color-line: #e6dccc;
+
+  --color-sunset: #c85030;
+  --color-sunset-deep: #a83f22;
+  --color-sunset-soft: #fdeadf;
+
+  --color-rust: #a05828;
+  --color-rust-soft: #fbeadf;
+
+  --color-gold: #f6c98b;
+  --color-gold-soft: #fdf0d9;
+
+  --color-sage: #3a5a51;
+  --color-sage-mid: #6b8f83;
+  --color-sage-soft: #dfeae5;
+
+  --color-peach: #fbdcc8;
+
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --text-display: 4.25rem;
+  --text-display--line-height: 0.96;
+  --text-display--letter-spacing: -0.02em;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible focus for keyboard users on every interactive element. WCAG 2.1 AA. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-sunset);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--color-ink);
+  color: var(--color-cream);
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
