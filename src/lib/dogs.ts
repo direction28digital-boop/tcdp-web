@@ -16,6 +16,16 @@ const FEED_URL =
 const PHOTO_BASE =
   "https://raw.githubusercontent.com/direction28digital-boop/foster-portal-importer/main/data/photos";
 
+/**
+ * Bios live in the importer repo too, written each morning by generate_bios.py from
+ * the county record. Fetching them (rather than importing the frozen file) is what
+ * lets a dog listed overnight have a story on their page by breakfast, with nobody
+ * doing anything. The bundled copy below stays as the fallback: if the fetch fails,
+ * pages render with the bios we already had rather than none at all.
+ */
+const BIOS_URL =
+  "https://raw.githubusercontent.com/direction28digital-boop/foster-portal-importer/main/data/bios.json";
+
 export type Bio = {
   animal_id: string;
   name: string;
@@ -67,7 +77,7 @@ export type DogFeed = {
 type RawDog = Record<string, unknown>;
 type RawFeed = { fetched_at?: string; active?: RawDog[]; resolved?: RawDog[] };
 
-const bios = biosData as Record<string, Bio>;
+const bundledBios = biosData as Record<string, Bio>;
 
 /** Phoenix does not observe daylight saving, so the county clock is always UTC-7. */
 function phoenixToday(): Date {
@@ -104,7 +114,7 @@ function normalizeName(raw: unknown, id: string): string {
     .join(" ");
 }
 
-function toDog(raw: RawDog): Dog | null {
+function toDog(raw: RawDog, bios: Record<string, Bio>): Dog | null {
   const id = str(raw.animal_id);
   if (!id) return null;
   const deadline = str(raw.deadline);
@@ -155,16 +165,20 @@ function byDeadline(a: Dog, b: Dog): number {
   return a.name.localeCompare(b.name);
 }
 
-function shape(raw: RawFeed, live: boolean): DogFeed {
+function shape(
+  raw: RawFeed,
+  live: boolean,
+  bios: Record<string, Bio>,
+): DogFeed {
   const active = (raw.active ?? [])
     .filter(isDog)
-    .map(toDog)
+    .map((raw) => toDog(raw, bios))
     .filter((d): d is Dog => d !== null)
     .sort(byDeadline);
 
   const resolved = (raw.resolved ?? [])
     .filter(isDog)
-    .map(toDog)
+    .map((raw) => toDog(raw, bios))
     .filter((d): d is Dog => d !== null);
 
   const transferred = resolved.filter((d) => d.status === "TRANSFERRED").length;
@@ -196,16 +210,34 @@ function shape(raw: RawFeed, live: boolean): DogFeed {
  * good render rather than an empty list. `live: false` marks the rare case where a page
  * renders cold with no feed, and the UI says so instead of implying zero dogs are waiting.
  */
+async function getBios(): Promise<Record<string, Bio>> {
+  try {
+    const res = await fetch(BIOS_URL, { next: { revalidate: 1800 } });
+    if (!res.ok) throw new Error(`Bios responded ${res.status}`);
+    const json = (await res.json()) as Record<string, Bio>;
+    if (typeof json !== "object" || json === null) {
+      throw new Error("Bios shape unexpected");
+    }
+    // Merge, never replace. A bio that exists in the bundle but not yet in the feed
+    // still renders, so a deploy can never blank out a dog's page.
+    return { ...bundledBios, ...json };
+  } catch (error) {
+    console.error("[tcdp] live bios unavailable, using bundled copy:", error);
+    return bundledBios;
+  }
+}
+
 export async function getDogs(): Promise<DogFeed> {
+  const bios = await getBios();
   try {
     const res = await fetch(FEED_URL, { next: { revalidate: 1800 } });
     if (!res.ok) throw new Error(`Feed responded ${res.status}`);
     const json = (await res.json()) as RawFeed;
     if (!Array.isArray(json.active)) throw new Error("Feed shape unexpected");
-    return shape(json, true);
+    return shape(json, true, bios);
   } catch (error) {
     console.error("[tcdp] live county feed unavailable:", error);
-    return shape({ active: [], resolved: [] }, false);
+    return shape({ active: [], resolved: [] }, false, bios);
   }
 }
 
