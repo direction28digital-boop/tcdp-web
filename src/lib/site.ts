@@ -23,11 +23,10 @@ export const SITE = {
   shortName: "TCDP",
   audienceName: "AZ Pound Pups",
   /**
-   * The application still runs on the dogfoster.org WPForms install. Every CTA points
-   * there until the new apply-once portal is proven, at which point this becomes an
-   * internal route and dogfoster.org 301s here.
+   * Every CTA links here. /apply is a redirect defined in next.config.ts, which is the
+   * one place to change when the rescue moves their application form.
    */
-  applyUrl: "https://dogfoster.org",
+  applyUrl: "/apply",
   applyLabel: "Apply to Save a Dog",
   phone: "602-834-4911",
   phoneHref: "tel:+16028344911",

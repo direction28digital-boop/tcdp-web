@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { SITE } from "@/lib/site";
 import { ASSETS } from "@/lib/assets";
 
@@ -63,14 +62,14 @@ export function SiteFooter() {
             Apply to Save
           </a>
           <p className="mt-5 text-sm leading-relaxed text-cream/75">
-            The application lives at{" "}
+            The short address on every flyer,{" "}
             <a
               href={SITE.applyUrl}
               className="font-semibold text-cream underline decoration-sunset decoration-2 underline-offset-4 hover:text-gold"
             >
               DOGFOSTER.ORG
             </a>
-            . That is the address on every flyer, and it will keep working.
+            , takes you to the same application.
           </p>
           <p className="mt-4 text-sm text-cream/75">
             Questions?{" "}
@@ -85,7 +84,7 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-cream/15">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-4 px-6 py-6 text-xs text-cream/50">
+        <div className="mx-auto max-w-[1180px] px-6 py-6 text-xs text-cream/50">
           <p>
             © {new Date().getFullYear()} {SITE.name}. Dog records and photos
             come from the{" "}
@@ -100,9 +99,6 @@ export function SiteFooter() {
             </a>
             .
           </p>
-          <Link href="/team" className="hover:text-cream">
-            Team sign in
-          </Link>
         </div>
       </div>
     </footer>
