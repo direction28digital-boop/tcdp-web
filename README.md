@@ -13,7 +13,14 @@ with their real deadline, and routes people to the application.
 - `/` homepage
 - `/dogs` searchable list of every active priority dog
 - `/dogs/[id]` a public page per dog
-- `/team` placeholder for the volunteer dashboard
+- `/apply` forwards to the rescue's application form (set in `next.config.ts`)
+
+## Deliberately simple
+
+This site has no database, no sign-in and no email sending. The application form is run by
+the rescue themselves (currently at dogfoster.org, moving to Jotform), so the only thing to
+change when the form moves is `APPLY_URL` in `next.config.ts`. No environment variables are
+needed to deploy it.
 
 ## Where the data comes from
 
