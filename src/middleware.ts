@@ -43,5 +43,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/team/:path*", "/me/:path*", "/apply/:path*", "/signin", "/auth/:path*"],
+  // /application is here because the page reads the session to reopen a saved
+  // application, so its auth cookie has to be refreshed like any signed-in page.
+  // /apply is gone: it is a redirect to /application now, not a page.
+  matcher: [
+    "/team/:path*",
+    "/me/:path*",
+    "/application/:path*",
+    "/signin",
+    "/auth/:path*",
+  ],
 };

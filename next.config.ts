@@ -1,15 +1,17 @@
 import type { NextConfig } from "next";
 
 /**
- * Where "Apply to Save" goes. This is the ONLY place to change when the rescue moves
- * the application (for example to their Jotform). Every button on the site links to
- * /apply, and /apply forwards here.
+ * The application lives at /application on this site (decided 2026-09-10). dogfoster.org
+ * redirects here at the registrar, so the old address keeps working forever and the
+ * WordPress install behind it can be switched off.
+ *
+ * /apply stays as a permanent alias because it is printed on flyers and pasted into
+ * Facebook posts that nobody can go back and edit.
  */
-const APPLY_URL = "https://dogfoster.org";
 
 const nextConfig: NextConfig = {
   async redirects() {
-    return [{ source: "/apply", destination: APPLY_URL, permanent: false }];
+    return [{ source: "/apply", destination: "/application", permanent: true }];
   },
   // The share card reads its fonts off disk at runtime, so keep them in the bundle.
   outputFileTracingIncludes: {
