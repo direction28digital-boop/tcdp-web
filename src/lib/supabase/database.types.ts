@@ -158,6 +158,15 @@ export type AlertLogRow = {
   sent_at: string;
 };
 
+export type ApplicationNoteRow = {
+  id: string;
+  org_id: string;
+  application_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+};
+
 type Table<Row, Optional extends keyof Row = never> = {
   Row: Row;
   Insert: Omit<Row, Optional> & Partial<Pick<Row, Optional>>;
@@ -202,6 +211,7 @@ export type Database = {
         | "paused" | "updated_at"
       >;
       alert_log: Table<AlertLogRow, "id" | "sent_at">;
+      application_notes: Table<ApplicationNoteRow, "id" | "author_id" | "created_at">;
     };
     Views: Record<never, never>;
     Functions: Record<never, never>;

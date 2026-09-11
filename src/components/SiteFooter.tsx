@@ -84,7 +84,7 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-cream/15">
-        <div className="mx-auto max-w-[1180px] px-6 py-6 text-xs text-cream/50">
+        <div className="mx-auto flex max-w-[1180px] flex-wrap items-baseline justify-between gap-4 px-6 py-6 text-xs text-cream/50">
           <p>
             © {new Date().getFullYear()} {SITE.name}. Dog records and photos
             come from the{" "}
@@ -99,6 +99,14 @@ export function SiteFooter() {
             </a>
             .
           </p>
+          {/* Quiet on purpose. Volunteers know it is here; nobody else needs
+              to be invited to find a sign-in box. */}
+          <a
+            href="/signin"
+            className="underline underline-offset-4 hover:text-cream"
+          >
+            Team sign in
+          </a>
         </div>
       </div>
     </footer>
