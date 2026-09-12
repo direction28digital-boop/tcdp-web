@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/auth";
-import { getDogs } from "@/lib/dogs";
+import { formatAge, formatBreed, getDogs, hasSomeone } from "@/lib/dogs";
 import type { Answers } from "@/lib/apply-flow";
 import type { ApplicationRow, Json } from "@/lib/supabase/database.types";
 
@@ -229,4 +229,110 @@ export async function saveApplication(
 
   revalidatePath("/application");
   revalidatePath("/me");
+}
+
+/**
+ * What one dog's record says, for the person about to apply for them.
+ *
+ * WHY THIS EXISTS. Dee, after asking the team what the old bios were costing:
+ * "time wasted investing on someone going to foster a dog, then backs out after
+ * seeing something or finding out on a phone screening."
+ *
+ * That is a funnel problem, not a copy problem. Somebody reads a warm write-up,
+ * spends twenty minutes on an application, waits for a call, and only then hears
+ * that the dog air-snaps at hands. They withdraw. Two volunteers lost an evening
+ * and the dog lost days off a clock where days are the whole game.
+ *
+ * Putting the shelter record on the dog's page fixed half of it. This is the
+ * other half: most applicants arrive from an Instagram link or a card and never
+ * open that page. So the record comes to them, inside the form, before the
+ * questions rather than after the phone call.
+ *
+ * Fetched one dog at a time on purpose. The form already holds every active dog
+ * for matching, and `sections` runs 8 to 16KB each — attaching them to that list
+ * would ship half a megabyte of shelter notes to a phone to show one dog's worth.
+ */
+export type DogDisclosure = {
+  id: string;
+  name: string;
+  photo: string | null;
+  detailUrl: string | null;
+  facts: string | null;
+  shelter: string | null;
+  deadline: string | null;
+  daysLeft: number | null;
+  nho: boolean;
+  /** The county's own priority reason: "Behavior" or "Medical". */
+  reason: string | null;
+  /** The county's own rating, their word. Null when we could not trust the parse. */
+  level: string | null;
+  /** Somebody has already stepped up for this dog. */
+  spokenFor: boolean;
+  memo: string | null;
+  evaluations: string | null;
+  biteHistory: string | null;
+};
+
+/** Keeps the payload to something a phone can read, with the full record one link away. */
+const EXCERPT = 1800;
+
+function excerpt(value: string | null): string | null {
+  if (!value) return null;
+  return value.length > EXCERPT ? `${value.slice(0, EXCERPT).trimEnd()}…` : value;
+}
+
+/**
+ * Resolves what somebody typed into a dog, using the same rules as the matcher
+ * that files the application — an exact ID, or a name that matches exactly one
+ * active dog. Anything ambiguous returns null and the form moves on rather than
+ * showing a stranger the wrong dog's bite history.
+ */
+export async function lookupDogForDisclosure(
+  raw: string,
+): Promise<DogDisclosure | null> {
+  const needle = raw.trim();
+  if (!needle) return null;
+
+  try {
+    const { active } = await getDogs();
+
+    let dog = null as (typeof active)[number] | null;
+    if (/^a\d{4,9}$/i.test(needle)) {
+      dog = active.find((d) => d.id.toLowerCase() === needle.toLowerCase()) ?? null;
+    } else {
+      const named = active.filter(
+        (d) => d.name.trim().toLowerCase() === needle.toLowerCase(),
+      );
+      if (named.length === 1) dog = named[0];
+    }
+    if (!dog) return null;
+
+    return {
+      id: dog.id,
+      name: dog.name,
+      photo: dog.photo,
+      detailUrl: dog.detailUrl,
+      facts: [formatAge(dog.age), dog.sex, formatBreed(dog.breed), dog.weight ? `${dog.weight} lb` : null]
+        .filter(Boolean)
+        .join(" · ") || null,
+      shelter: [dog.shelter, dog.kennel ? `Kennel ${dog.kennel}` : null]
+        .filter(Boolean)
+        .join(" · ") || null,
+      deadline: dog.deadline,
+      daysLeft: dog.daysLeft,
+      nho: dog.nho,
+      reason: dog.reason,
+      level: dog.level,
+      spokenFor: hasSomeone(dog),
+      memo: excerpt(dog.sections.memo),
+      evaluations: excerpt(dog.sections.evaluationComments),
+      biteHistory: excerpt(dog.sections.biteHistory),
+    };
+  } catch (error) {
+    // The county feed being down must never cost somebody their application.
+    // No disclosure is a worse outcome than a slow one, but a blocked form is
+    // worse than both.
+    console.error("[apply] disclosure skipped, feed unavailable", error);
+    return null;
+  }
 }

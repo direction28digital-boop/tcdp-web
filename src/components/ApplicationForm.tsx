@@ -11,7 +11,12 @@ import {
   type Step,
 } from "@/lib/apply-flow";
 import { createClient } from "@/lib/supabase/client";
-import { saveApplication } from "@/app/application/actions";
+import {
+  lookupDogForDisclosure,
+  saveApplication,
+  type DogDisclosure,
+} from "@/app/application/actions";
+import { DogDisclosurePanel } from "@/components/DogDisclosure";
 
 /**
  * The real application. Grown out of the August prototype, which already had the
@@ -72,6 +77,14 @@ export function ApplicationForm({
   const [submitting, setSubmitting] = useState(false);
   const [checkEmail, setCheckEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The dog's own record, shown between "which dog" and the questions. Held in
+  // state rather than fetched per render because leaving this screen must not
+  // refetch it, and coming Back to it must not either.
+  const [disclosure, setDisclosure] = useState<DogDisclosure | null>(null);
+  const [looking, setLooking] = useState(false);
+  // Set once they have read it. Stops the screen reappearing every time they
+  // step back through the form, which would read as the site nagging them.
+  const [acknowledged, setAcknowledged] = useState(false);
 
   // Restore a draft left behind by the magic-link round trip. Server answers win,
   // because a saved application is a stronger signal than an abandoned tab.
@@ -142,6 +155,45 @@ export function ApplicationForm({
       answers.size !== undefined ||
       answers.breedsNotAllowed !== undefined);
 
+  /**
+   * Leaving the first step is where the disclosure belongs.
+   *
+   * By here they have told us they are in Arizona and named a dog, and they have
+   * not yet answered anything long. Showing the record now costs them ten
+   * seconds; showing it at the end, or not at all, costs a phone screening and
+   * several days of the dog's clock.
+   *
+   * If the name does not resolve to exactly one dog on today's list there is
+   * nothing honest to show, so the form moves on. A volunteer picks that up in
+   * Needs attention, which is what that group is for.
+   */
+  async function advanceFromStart() {
+    const wantsOne = answers.dogInterest === "A specific dog";
+    const raw =
+      typeof answers.dogIdentifier === "string" ? answers.dogIdentifier : "";
+
+    if (!wantsOne || raw.trim() === "" || acknowledged) {
+      setStepIndex(1);
+      return;
+    }
+
+    setLooking(true);
+    try {
+      const found = await lookupDogForDisclosure(raw);
+      if (found) {
+        setDisclosure(found);
+        return;
+      }
+    } catch (err) {
+      // Never block the form on this. An application that exists beats a
+      // disclosure that was not available.
+      console.error("[apply] disclosure lookup failed", err);
+    } finally {
+      setLooking(false);
+    }
+    setStepIndex(1);
+  }
+
   function set(id: string, value: Value) {
     setAnswers((prev) => {
       const next = { ...prev, [id]: value };
@@ -183,6 +235,33 @@ export function ApplicationForm({
           </button>
         </div>
       </div>
+    );
+  }
+
+  // Shown between step one and the questions, never as a modal. A modal over a
+  // half-filled form invites a reflexive dismissal, and this is the one screen
+  // nobody should be able to wave away without reading the heading.
+  if (disclosure) {
+    return (
+      <DogDisclosurePanel
+        dog={disclosure}
+        onContinue={() => {
+          setAcknowledged(true);
+          setDisclosure(null);
+          setStepIndex(1);
+        }}
+        onChooseAnother={() => {
+          // Their answer changes to the real one, not a blank. Somebody who
+          // steps back from a specific dog after reading the record is still a
+          // foster, and "any dog I can help" is the answer the dogs nobody
+          // asked about actually need.
+          set("dogInterest", "Any dog I can help");
+          set("dogIdentifier", "");
+          setAcknowledged(true);
+          setDisclosure(null);
+          setStepIndex(1);
+        }}
+      />
     );
   }
 
@@ -292,6 +371,23 @@ export function ApplicationForm({
           </p>
         ) : null}
 
+        {/* Named at the end, not asked again. They already acknowledged the
+            record; this is so nobody sends an application for a dog they have
+            stopped thinking about three steps later. */}
+        {stepIndex === APPLY_STEPS.length - 1 &&
+        answers.dogInterest === "A specific dog" &&
+        typeof answers.dogIdentifier === "string" &&
+        answers.dogIdentifier.trim() !== "" ? (
+          <p className="mt-8 rounded-xl bg-cream px-5 py-4 leading-relaxed text-ink-soft">
+            You are applying for{" "}
+            <span className="font-semibold text-ink">
+              {answers.dogIdentifier}
+            </span>
+            , whose shelter record you read at the start — and your application
+            counts for every other dog on the list too.
+          </p>
+        ) : null}
+
         <div className="mt-10 flex flex-wrap items-center gap-4">
           {stepIndex > 0 ? (
             <button
@@ -304,19 +400,21 @@ export function ApplicationForm({
           ) : null}
           <button
             type="button"
-            disabled={submitting}
-            onClick={() =>
-              stepIndex === APPLY_STEPS.length - 1
-                ? submit()
-                : setStepIndex(stepIndex + 1)
-            }
+            disabled={submitting || looking}
+            onClick={() => {
+              if (stepIndex === APPLY_STEPS.length - 1) return submit();
+              if (stepIndex === 0) return void advanceFromStart();
+              setStepIndex(stepIndex + 1);
+            }}
             className="rounded-full bg-sunset px-8 py-3.5 font-display text-sm font-bold tracking-wide text-white uppercase hover:bg-sunset-deep disabled:opacity-60"
           >
             {stepIndex === APPLY_STEPS.length - 1
               ? submitting
                 ? "Sending"
                 : "Send my application"
-              : "Next"}
+              : looking
+                ? "Looking them up"
+                : "Next"}
           </button>
           <p className="text-sm text-ink-soft/80">
             You only fill this in once.
