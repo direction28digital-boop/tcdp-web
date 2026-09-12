@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { DogDisclosure } from "@/app/application/actions";
 import { daysLeftLabel, formatDeadline } from "@/lib/dogs";
+import { planEntries, type Entry } from "@/lib/shelter-entries";
 
 /**
  * The record, before the questions.
@@ -110,7 +111,7 @@ export function DogDisclosurePanel({
 
         {dog.detailUrl ? (
           <p className="mt-5 text-sm leading-relaxed text-ink-soft/80">
-            Shortened to fit.{" "}
+            That is the whole record, nothing cut.{" "}
             <a
               href={dog.detailUrl}
               target="_blank"
@@ -161,16 +162,58 @@ function Flag({ label }: { label: string }) {
 
 function Record({ title, body }: { title: string; body: string | null }) {
   if (!body) return null;
+  const plan = planEntries(body);
+
   return (
     <section className="rounded-2xl bg-cream px-5 py-4">
       <h3 className="font-display text-sm font-bold tracking-wide text-ink uppercase">
         {title}
       </h3>
-      {/* Whitespace preserved: the county's line breaks are what separate one
-          dated observation from the next. */}
-      <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-line text-ink-soft">
-        {body}
-      </p>
+
+      {/* Folded, never cut. Somebody reading a shortened version here and
+          meeting the rest on a phone call later is the exact thing this screen
+          exists to prevent. */}
+      {plan ? (
+        <div className="mt-2">
+          <Entries entries={plan.shown} />
+          <details className="group/all mt-3">
+            <summary className="inline-flex cursor-pointer items-center font-display text-xs font-bold tracking-wide text-sunset uppercase underline underline-offset-4 marker:content-['']">
+              <span className="group-open/all:hidden">
+                Show all {plan.shown.length + plan.hidden.length} entries
+              </span>
+              <span className="hidden group-open/all:inline">Show fewer</span>
+            </summary>
+            <div className="mt-3">
+              <Entries entries={plan.hidden} />
+            </div>
+          </details>
+        </div>
+      ) : (
+        <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-line text-ink-soft">
+          {body}
+        </p>
+      )}
     </section>
+  );
+}
+
+function Entries({ entries }: { entries: Entry[] }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {entries.map((entry, i) => (
+        <div key={`${entry.date ?? "pre"}-${i}`}>
+          {entry.date ? (
+            <p className="font-display text-xs font-bold tracking-wide text-ink-soft/70 uppercase">
+              {entry.date}
+            </p>
+          ) : null}
+          {/* Whitespace preserved: the county's line breaks are what separate
+              one dated observation from the next. */}
+          <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-line text-ink-soft">
+            {entry.body}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }

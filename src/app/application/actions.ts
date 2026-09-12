@@ -273,13 +273,19 @@ export type DogDisclosure = {
   biteHistory: string | null;
 };
 
-/** Keeps the payload to something a phone can read, with the full record one link away. */
-const EXCERPT = 1800;
-
-function excerpt(value: string | null): string | null {
-  if (!value) return null;
-  return value.length > EXCERPT ? `${value.slice(0, EXCERPT).trimEnd()}…` : value;
-}
+/**
+ * Sections travel whole.
+ *
+ * They used to be cut at 1,800 characters here. That put the applicant in the
+ * same position the old bios did — reading a shortened version and meeting the
+ * rest later — which is the exact failure this screen was built to stop. The
+ * panel folds long sections behind "show all entries" instead, so the full text
+ * is on the page, one click away, and never off-site.
+ *
+ * One dog's record is 16KB at the very worst and it is text, so it gzips to
+ * almost nothing. The payload argument only ever applied to the list pages,
+ * where it is every dog at once.
+ */
 
 /**
  * Resolves what somebody typed into a dog, using the same rules as the matcher
@@ -324,9 +330,9 @@ export async function lookupDogForDisclosure(
       reason: dog.reason,
       level: dog.level,
       spokenFor: hasSomeone(dog),
-      memo: excerpt(dog.sections.memo),
-      evaluations: excerpt(dog.sections.evaluationComments),
-      biteHistory: excerpt(dog.sections.biteHistory),
+      memo: dog.sections.memo,
+      evaluations: dog.sections.evaluationComments,
+      biteHistory: dog.sections.biteHistory,
     };
   } catch (error) {
     // The county feed being down must never cost somebody their application.

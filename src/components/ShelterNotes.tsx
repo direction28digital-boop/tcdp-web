@@ -1,4 +1,5 @@
 import type { Sections } from "@/lib/dogs";
+import { planEntries, type Entry } from "@/lib/shelter-entries";
 
 /**
  * The county record, shown as the county wrote it.
@@ -9,30 +10,22 @@ import type { Sections } from "@/lib/dogs";
  * medical log and the kennel rounds sit lower because they are long, clinical and
  * matter to fewer readers. Nothing is rewritten, trimmed or paraphrased.
  *
- * The memo and the behaviour evaluations open on arrival; the long clinical
- * blocks stay closed. Dee: "we need to disclose it all so people know up front
- * what they are getting into." A disclosure somebody has to go looking for is
- * the shape of hiding something — but median evaluation comments run 3,600
- * characters and the longest is 12,500, so opening the medical log and the
- * kennel scores too would bury the photo and the deadline under clinical prose
- * and nobody would reach the part that matters.
+ * EVERY CHARACTER IS ON THIS PAGE. Long sections open on their most recent dated
+ * entries with the rest behind "Show all N entries" — not a link somewhere else.
+ * Dee: "I would rather have it all here, even if we have to expand." She is
+ * right, and the old 2,500-character cut was worse than it looked: it dropped
+ * eleven of Cruz's fifteen handler entries, and pointed at a county page that
+ * disappears the moment a dog leaves the list.
+ *
+ * The memo and the evaluations open on arrival; the clinical blocks stay closed.
+ * A disclosure somebody has to go looking for is the shape of hiding something,
+ * but opening all six would bury the photo and the deadline under a medication
+ * log nobody is deciding on.
  */
-const LONG_ENOUGH_TO_SEND_THEM_ON = 2500;
-
 type Block = {
   key: keyof Sections;
   title: string;
   note?: string;
-  /**
-   * Open on arrival.
-   *
-   * Dee: "we need to disclose it all so people know up front what they are
-   * getting into." Collapsing the two blocks that carry the substance would have
-   * made this page a disclosure people had to go looking for, which is the shape
-   * of hiding something. The memo and the evaluations are open; the medical log,
-   * the kennel scores and the dates stay closed because they are long, clinical,
-   * and not what anybody is deciding on.
-   */
   open?: boolean;
 };
 
@@ -49,23 +42,14 @@ const BLOCKS: Block[] = [
     note: "Written by handlers, dated, in their words.",
     open: true,
   },
-  {
-    key: "biteHistory",
-    title: "Bite history",
-  },
+  { key: "biteHistory", title: "Bite history" },
   {
     key: "kennelRounds",
     title: "Daily kennel rounds",
     note: "The county's own scoring. The numbers are theirs, not ours.",
   },
-  {
-    key: "medicalTreatments",
-    title: "Medical record",
-  },
-  {
-    key: "intake",
-    title: "Dates and requirements",
-  },
+  { key: "medicalTreatments", title: "Medical record" },
+  { key: "intake", title: "Dates and requirements" },
 ];
 
 export function ShelterNotes({
@@ -104,64 +88,103 @@ export function ShelterNotes({
       </p>
 
       <div className="mt-6 flex flex-col gap-3">
-        {present.map((block) => {
-          const body = sections[block.key]!;
-          const long = body.length > LONG_ENOUGH_TO_SEND_THEM_ON;
-          const shown = long
-            ? body.slice(0, LONG_ENOUGH_TO_SEND_THEM_ON).trimEnd()
-            : body;
+        {present.map((block) => (
+          <details
+            key={block.key}
+            open={block.open}
+            className="group rounded-2xl bg-cream px-5 py-4 open:bg-cream-deep/40"
+          >
+            <summary className="flex cursor-pointer items-center justify-between gap-4 font-display text-sm font-bold tracking-wide text-ink uppercase marker:content-['']">
+              <span>{block.title}</span>
+              <span
+                aria-hidden="true"
+                className="text-ink-soft transition-transform group-open:rotate-180"
+              >
+                ▾
+              </span>
+            </summary>
 
-          return (
-            <details
-              key={block.key}
-              open={block.open}
-              className="group rounded-2xl bg-cream px-5 py-4 open:bg-cream-deep/40"
-            >
-              <summary className="flex cursor-pointer items-center justify-between gap-4 font-display text-sm font-bold tracking-wide text-ink uppercase marker:content-['']">
-                <span>{block.title}</span>
-                <span
-                  aria-hidden="true"
-                  className="text-ink-soft transition-transform group-open:rotate-180"
-                >
-                  ▾
-                </span>
-              </summary>
+            {block.note ? (
+              <p className="mt-3 text-sm text-ink-soft">{block.note}</p>
+            ) : null}
 
-              {block.note ? (
-                <p className="mt-3 text-sm text-ink-soft">{block.note}</p>
-              ) : null}
-
-              {/* Whitespace preserved: the county's line breaks separate one
-                  dated entry from the next, and collapsing them runs a week of
-                  observations into one paragraph. */}
-              <p className="mt-3 text-[15px] leading-relaxed whitespace-pre-line text-ink-soft">
-                {shown}
-                {long ? "…" : ""}
-              </p>
-
-              {long && detailUrl ? (
-                <p className="mt-4">
-                  <SourceLink
-                    href={detailUrl}
-                    label={`Read the rest on the county's page`}
-                  />
-                </p>
-              ) : null}
-            </details>
-          );
-        })}
+            <SectionBody body={sections[block.key]!} />
+          </details>
+        ))}
       </div>
 
       {detailUrl ? (
         <p className="mt-6 text-sm leading-relaxed text-ink-soft/80">
-          This is a copy, taken from the county&rsquo;s priority portal and
-          refreshed every hour.{" "}
+          This is a complete copy, taken from the county&rsquo;s priority portal
+          and refreshed every hour.{" "}
           <SourceLink href={detailUrl} label="See the original" /> — though the
           county takes a dog&rsquo;s page down once they leave the list, so that
-          link stops working when {dogName} gets out.
+          link stops working when {dogName} gets out. This page will not.
         </p>
       ) : null}
     </div>
+  );
+}
+
+function SectionBody({ body }: { body: string }) {
+  const plan = planEntries(body);
+
+  // Undated, or a single entry: nothing to fold, so it renders whole.
+  if (!plan) return <Prose>{body}</Prose>;
+
+  return (
+    <div className="mt-3">
+      <EntryList entries={plan.shown} />
+
+      {/* Nested on purpose rather than a button: a <details> needs no
+          JavaScript, so the rest of the record is reachable even if the page
+          never hydrates — which is the one thing this section cannot afford. */}
+      <details className="mt-3 group/all">
+        <summary className="inline-flex cursor-pointer items-center gap-2 font-display text-xs font-bold tracking-wide text-sunset uppercase underline underline-offset-4 marker:content-['']">
+          <span className="group-open/all:hidden">
+            Show all {plan.shown.length + plan.hidden.length} entries
+          </span>
+          <span className="hidden group-open/all:inline">Show fewer</span>
+        </summary>
+        <div className="mt-3">
+          <EntryList entries={plan.hidden} />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function EntryList({ entries }: { entries: Entry[] }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {entries.map((entry, i) => (
+        <div key={`${entry.date ?? "pre"}-${i}`}>
+          {entry.date ? (
+            <p className="font-display text-xs font-bold tracking-wide text-ink-soft/70 uppercase">
+              {entry.date}
+            </p>
+          ) : null}
+          <Prose className={entry.date ? "mt-1" : undefined}>{entry.body}</Prose>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Whitespace preserved: the county's line breaks carry the structure. */
+function Prose({
+  children,
+  className = "mt-3",
+}: {
+  children: string;
+  className?: string;
+}) {
+  return (
+    <p
+      className={`text-[15px] leading-relaxed whitespace-pre-line text-ink-soft ${className}`}
+    >
+      {children}
+    </p>
   );
 }
 
