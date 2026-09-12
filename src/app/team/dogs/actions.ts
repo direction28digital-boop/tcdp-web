@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireMember } from "@/lib/auth";
+import { isStaff, requireMember } from "@/lib/auth";
+import { styleWarnings } from "@/lib/dog-notes";
 import type { WorkStatus } from "@/lib/supabase/database.types";
 
 const BUCKET = "dog-videos";
@@ -93,6 +94,7 @@ export async function recordVideo(
   path: string,
   sizeBytes: number,
   mimeType: string,
+  hasOverlays = false,
 ): Promise<{ error: string } | void> {
   const viewer = await requireMember();
 
@@ -111,6 +113,7 @@ export async function recordVideo(
     mime_type: mimeType,
     size_bytes: sizeBytes,
     uploaded_by: viewer.profile.id,
+    has_overlays: hasOverlays,
   });
 
   if (error) {
@@ -120,6 +123,11 @@ export async function recordVideo(
 
   // A dog with a clip is filmed, unless somebody has already moved them
   // further along. Never walk a status backwards on somebody else's behalf.
+  //
+  // A clip that arrived with overlays already on it is not raw footage: it is
+  // finished work. Sending it to a queue marked "needs editing" would have
+  // somebody redo what is already done, which is the fastest way to teach a
+  // volunteer that the tracker lies.
   const { data: current } = await supabase
     .from("dog_work_status")
     .select("work_status")
@@ -127,11 +135,17 @@ export async function recordVideo(
     .eq("dog_id", dogId)
     .maybeSingle();
 
-  if (!current || current.work_status === "not_started") {
+  const reached: WorkStatus = hasOverlays ? "edited" : "filmed";
+  const behind =
+    !current ||
+    current.work_status === "not_started" ||
+    (hasOverlays && current.work_status === "filmed");
+
+  if (behind) {
     await supabase.from("dog_work_status").upsert({
       org_id: viewer.org.id,
       dog_id: dogId,
-      work_status: "filmed",
+      work_status: reached,
       updated_by: viewer.profile.id,
       updated_at: new Date().toISOString(),
     });
@@ -282,4 +296,67 @@ export async function getVideoUrl(
     return { error: "Could not open that video." };
   }
   return { url: data.signedUrl };
+}
+
+/**
+ * The rescue's own words about a dog, written by team or admin.
+ *
+ * Staff only, and RLS agrees: dog_bio_overrides is behind private.is_org_staff()
+ * since the volunteer role exists. A volunteer with a camera should not be able
+ * to rewrite what the public reads.
+ *
+ * House-style warnings are raised in the editor as somebody types and are NOT
+ * enforced here. Blocking a save would send the person to a different tool, and
+ * then the house style lives nowhere at all.
+ */
+export async function saveDogNote(
+  dogId: string,
+  note: string,
+): Promise<{ error: string } | void> {
+  const viewer = await requireMember();
+  if (!isStaff(viewer)) {
+    return { error: "Only the team can write what we say about a dog." };
+  }
+
+  const trimmed = note.trim();
+  if (trimmed.length > 2000) {
+    return { error: "That is longer than anyone will read. Keep it under 2000 characters." };
+  }
+
+  const supabase = await createClient();
+
+  if (trimmed === "") {
+    // Clearing means clearing. Leaving an empty row behind would show an empty
+    // box with our name on it on the public page.
+    const { error } = await supabase
+      .from("dog_bio_overrides")
+      .delete()
+      .eq("org_id", viewer.org.id)
+      .eq("dog_id", dogId);
+    if (error) {
+      console.error("[team] could not clear dog note", error);
+      return { error: "Could not clear that. Try again." };
+    }
+  } else {
+    const { error } = await supabase.from("dog_bio_overrides").upsert({
+      org_id: viewer.org.id,
+      dog_id: dogId,
+      bio: { note: trimmed },
+      edited_by: viewer.profile.id,
+      edited_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("[team] could not save dog note", error);
+      return { error: "Could not save that. Try again." };
+    }
+  }
+
+  // Logged, not blocked, so a pattern of overrides is visible later.
+  const warnings = styleWarnings(trimmed);
+  if (warnings.length > 0) {
+    console.warn("[team] dog note saved against house style", { dogId, warnings });
+  }
+
+  revalidatePath(`/team/dogs/${dogId}`);
+  revalidatePath(`/dogs/${dogId}`);
 }

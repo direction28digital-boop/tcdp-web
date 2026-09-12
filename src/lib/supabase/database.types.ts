@@ -163,6 +163,8 @@ export type DogVideoRow = {
   posted_url: string | null;
   posted_at: string | null;
   note: string | null;
+  /** Uploader says this clip already has overlays burned in. Skips the edit step. */
+  has_overlays: boolean;
 };
 
 export type AlertPrefsRow = {
@@ -233,7 +235,7 @@ export type Database = {
       dog_videos: Table<
         DogVideoRow,
         | "id" | "mime_type" | "size_bytes" | "uploaded_by" | "uploaded_at"
-        | "posted_url" | "posted_at" | "note"
+        | "posted_url" | "posted_at" | "note" | "has_overlays"
       >;
       alert_prefs: Table<
         AlertPrefsRow,

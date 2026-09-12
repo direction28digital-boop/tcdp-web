@@ -16,6 +16,8 @@ import {
   getDogs,
   type Dog,
 } from "@/lib/dogs";
+import { ShelterNotes, RescueNote } from "@/components/ShelterNotes";
+import { getSiteNote } from "@/lib/dog-notes.server";
 import { SITE } from "@/lib/site";
 
 type Params = { params: Promise<{ id: string }> };
@@ -31,9 +33,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!dog) return { title: "Dog not found" };
   return {
     title: `${dog.name}, ${daysLeftLabel(dog.daysLeft).toLowerCase()}`,
-    description:
-      dog.bio?.story ??
-      `${dog.name} is on the Maricopa County priority list with a deadline of ${formatDeadline(dog.deadline)}.`,
+    description: `${dog.name} is on the Maricopa County priority list with a deadline of ${formatDeadline(dog.deadline)}.`,
     openGraph: dog.photo ? { images: [dog.photo] } : undefined,
   };
 }
@@ -42,6 +42,8 @@ export default async function DogPage({ params }: Params) {
   const { id } = await params;
   const dog = await getDog(id);
   if (!dog) notFound();
+
+  const rescueNote = await getSiteNote(dog.id);
 
   const out = dog.status === "TRANSFERRED" || dog.status === "ADOPTED";
   // Somebody has stepped up but the dog has not left yet. Not out, not urgent.
@@ -120,17 +122,10 @@ export default async function DogPage({ params }: Params) {
                   </p>
                 ) : null}
 
-                {dog.bio?.story ? (
-                  <p className="mt-5 text-lg leading-relaxed text-ink-soft">
-                    {dog.bio.story}
-                  </p>
-                ) : (
-                  <p className="mt-5 text-lg leading-relaxed text-ink-soft">
-                    We have not written {dog.name}&rsquo;s story yet. Everything
-                    below comes straight from the county record, and one of us
-                    is working on the rest.
-                  </p>
-                )}
+                <p className="mt-5 text-lg leading-relaxed text-ink-soft">
+                  Everything below is {dog.name}&rsquo;s Maricopa County record,
+                  exactly as the shelter wrote it.
+                </p>
 
                 {out ? (
                   <div className="mt-8 rounded-2xl bg-sage-soft p-6">
@@ -178,44 +173,19 @@ export default async function DogPage({ params }: Params) {
         <section className="bg-surface pt-4 pb-20">
           <div className="mx-auto grid max-w-[1180px] gap-12 px-6 md:grid-cols-[1.15fr_1fr]">
             <div>
-              {dog.bio?.bullets.length ? (
-                <>
-                  <h2 className="font-display text-2xl font-extrabold text-ink">
-                    What the shelter has seen
-                  </h2>
-                  <ul className="mt-5 space-y-3">
-                    {dog.bio.bullets.map((line) => (
-                      <li
-                        key={line}
-                        className="flex gap-3 text-lg leading-relaxed text-ink-soft"
-                      >
-                        <span aria-hidden="true" className="text-sunset">
-                          ●
-                        </span>
-                        <span>{line}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
+              <ShelterNotes
+                sections={dog.sections}
+                detailUrl={dog.detailUrl}
+                dogName={dog.name}
+              />
 
-              {dog.bio?.needs ? (
-                <div className="mt-9 rounded-2xl bg-sunset-soft p-6">
-                  <h2 className="font-display text-sm font-bold tracking-[0.16em] text-rust uppercase">
-                    What {dog.name} needs
-                  </h2>
-                  <p className="mt-3 text-lg leading-relaxed text-ink">
-                    {dog.bio.needs}
-                  </p>
-                </div>
-              ) : null}
+              {rescueNote ? <RescueNote note={rescueNote} /> : null}
 
               <p className="mt-9 text-sm leading-relaxed text-ink-soft/80">
-                Everything here comes from {dog.name}&rsquo;s Maricopa County
-                Animal Care and Control record. We leave out the parts that
-                belong between the shelter, the rescue and the vet, and we do
-                not soften what a dog needs. If something changes at the
-                shelter, this page changes with it.
+                This is {dog.name}&rsquo;s Maricopa County Animal Care and
+                Control record, copied hourly and shown in full. We do not
+                rewrite it, soften it or summarise it. Anything written in our
+                own voice is in a box with our name on it.
               </p>
             </div>
 

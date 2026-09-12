@@ -7,6 +7,9 @@ import { TeamNav } from "@/components/team/TeamNav";
 import { VideoUpload } from "@/components/team/VideoUpload";
 import { VideoList, type VideoItem } from "@/components/team/VideoList";
 import { WorkStatusControl } from "@/components/team/WorkStatus";
+import { DogNoteEditor } from "@/components/team/DogNoteEditor";
+import { ShelterNotes } from "@/components/ShelterNotes";
+import { getDogNote } from "@/lib/dog-notes.server";
 import { isStaff, requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { WorkStatus } from "@/lib/supabase/database.types";
@@ -38,6 +41,7 @@ export default async function TeamDogPage({
   if (!dog) notFound();
 
   const supabase = await createClient();
+  const rescueNote = await getDogNote(viewer.org.id, dog.id);
 
   const [{ data: work }, { data: videoRows }, { data: apps }] =
     await Promise.all([
@@ -202,6 +206,16 @@ export default async function TeamDogPage({
                 />
               </section>
 
+              {isStaff(viewer) ? (
+                <section className="rounded-2xl bg-surface p-6">
+                  <DogNoteEditor
+                    dogId={dog.id}
+                    dogName={dog.name}
+                    initial={rescueNote ?? ""}
+                  />
+                </section>
+              ) : null}
+
               <section>
                 <h2 className="font-display text-2xl font-extrabold text-ink">
                   Video
@@ -216,6 +230,14 @@ export default async function TeamDogPage({
                 <div className="mt-6">
                   <VideoList dogId={dog.id} videos={videos} />
                 </div>
+              </section>
+
+              <section>
+                <ShelterNotes
+                  sections={dog.sections}
+                  detailUrl={dog.detailUrl}
+                  dogName={dog.name}
+                />
               </section>
             </div>
           </div>

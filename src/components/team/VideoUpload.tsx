@@ -22,6 +22,9 @@ export function VideoUpload({ dogId }: { dogId: string }) {
   const [percent, setPercent] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
+  // Sticky across uploads on purpose: somebody working through a batch of
+  // already-edited clips sets it once rather than ticking it eleven times.
+  const [hasOverlays, setHasOverlays] = useState(false);
 
   function reset() {
     setPhase("idle");
@@ -94,7 +97,13 @@ export function VideoUpload({ dogId }: { dogId: string }) {
 
     xhrRef.current = null;
     setPhase("saving");
-    const saved = await recordVideo(dogId, signed.path, file.size, file.type);
+    const saved = await recordVideo(
+      dogId,
+      signed.path,
+      file.size,
+      file.type,
+      hasOverlays,
+    );
     if (saved?.error) {
       setError(saved.error);
       reset();
@@ -124,12 +133,31 @@ export function VideoUpload({ dogId }: { dogId: string }) {
       />
 
       {!busy && phase !== "done" ? (
-        <label
-          htmlFor={`video-${dogId}`}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-sunset px-6 py-3 font-display text-xs font-bold tracking-wide text-white uppercase hover:bg-sunset-deep focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
-        >
-          Add a video
-        </label>
+        <div className="flex flex-col gap-4">
+          <label
+            htmlFor={`video-${dogId}`}
+            className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-full bg-sunset px-6 py-3 font-display text-xs font-bold tracking-wide text-white uppercase hover:bg-sunset-deep focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
+          >
+            Add a video
+          </label>
+
+          {/* Plenty of what they post is edited before it ever reaches us. Saying
+              so here is what keeps a finished video out of the editing queue. */}
+          <label className="flex w-fit cursor-pointer items-start gap-3 text-sm leading-relaxed text-ink-soft">
+            <input
+              type="checkbox"
+              checked={hasOverlays}
+              onChange={(e) => setHasOverlays(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-sunset)]"
+            />
+            <span>
+              <span className="font-semibold text-ink">
+                This one is already done
+              </span>{" "}
+              — overlays and branding are on it, ready to post as is.
+            </span>
+          </label>
+        </div>
       ) : null}
 
       {busy ? (

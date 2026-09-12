@@ -4,10 +4,20 @@ import biosData from "@/data/bios.json";
  * Live dog data comes from the foster-portal-importer, which scrapes the MCACC
  * Priority Placement Portal hourly and commits the result to GitHub.
  *
- * IMPORTANT (rule locked with Dee + Joann): the importer's `sections` field holds raw
- * shelter memos, behavior evaluations, medical treatment history and bite history.
- * That material is INTERNAL ONLY. It is stripped here, at the data boundary, so it is
- * structurally impossible for a public page to render it.
+ * SECTIONS ARE PUBLIC AS OF 2026-09-12, reversing the earlier internal-only rule.
+ *
+ * Dee: "They only want the actual data from the shelter, no AI enhancements,
+ * people keep wanting to see the shelter notes." The rescue's own posts already
+ * publish this material and say so out loud — "honest write-ups, bite history and
+ * placement restrictions included" — so the site was being more squeamish than the
+ * rescue it speaks for, which helped nobody and made the page look like it was
+ * hiding something.
+ *
+ * The generated bio is gone with it. A written-up "story" makes behavioural claims
+ * in the shelter's voice that the shelter never made ("He's not aggressive. He's
+ * terrified."), and a foster who acts on a sentence like that is acting on ours,
+ * not the county's. What the rescue wants to say now lives in its own labelled
+ * block, beside the record rather than on top of it.
  */
 
 const FEED_URL =
@@ -37,6 +47,23 @@ export type Bio = {
   needs: string;
 };
 
+/**
+ * The county record, verbatim.
+ *
+ * Deliberately NOT cleaned up, reordered or summarised. The moment this code
+ * starts deciding which sentences matter it is doing the thing Dee asked it to
+ * stop doing. The one exception is `stripFormJunk` below, and that removes page
+ * furniture the scraper swept up, not anything the shelter wrote.
+ */
+export type Sections = {
+  intake: string | null;
+  memo: string | null;
+  evaluationComments: string | null;
+  medicalTreatments: string | null;
+  kennelRounds: string | null;
+  biteHistory: string | null;
+};
+
 export type Dog = {
   id: string;
   name: string;
@@ -57,7 +84,26 @@ export type Dog = {
   photo: string | null;
   detailUrl: string | null;
   bio: Bio | null;
+  sections: Sections;
 };
+
+/**
+ * What a card needs, and nothing else.
+ *
+ * `sections` is the whole county record — 8 to 16KB per dog, and DogBrowser is a
+ * client component, so handing it a full Dog[] would serialise half a megabyte of
+ * shelter notes into a page most of this audience opens on a phone. Stripped here
+ * rather than trusted to whoever writes the next list page.
+ *
+ * `bio` goes too, because the generated bio is gone: the only prose on a card is
+ * now the rescue's own note, if somebody wrote one.
+ */
+export type CardDog = Omit<Dog, "sections" | "bio"> & { note?: string | null };
+
+export function toCardDog(dog: Dog, note?: string | null): CardDog {
+  const { sections: _sections, bio: _bio, ...rest } = dog;
+  return { ...rest, note: note ?? null };
+}
 
 export type DogFeed = {
   fetchedAt: string;
@@ -112,6 +158,52 @@ function daysUntil(deadline: string | null): number | null {
   return Math.round((target.getTime() - phoenixToday().getTime()) / 86_400_000);
 }
 
+/**
+ * Cuts the scraped page furniture off the end of a section.
+ *
+ * The county's detail page ends every record with the Pull Animal Request form:
+ * passcode instructions, New Hope Partner rules, a support phone number. The
+ * scraper takes the text as it finds it, so that boilerplate landed inside
+ * `bite_history` on every animal. Measured on the live feed: 69,839 characters
+ * of bite history across 37 animals, of which 945 are real. The rest is the form.
+ *
+ * So "No recorded bites" — the entire truth for almost every dog — was buried
+ * under 1,800 characters of instructions about passcodes.
+ *
+ * This is not editing the shelter's words. It is removing text that was never
+ * about the animal. Worth fixing upstream in the importer too, but stripping here
+ * means the site is right before that ships.
+ */
+const FORM_JUNK = [
+  "Pull Animal Request",
+  "Group Passcode",
+  "Additional Help",
+];
+
+function stripFormJunk(value: string | null): string | null {
+  if (!value) return null;
+  let out = value;
+  for (const marker of FORM_JUNK) {
+    const at = out.indexOf(marker);
+    if (at !== -1) out = out.slice(0, at);
+  }
+  out = out.trim();
+  return out === "" ? null : out;
+}
+
+function sectionsOf(raw: RawDog): Sections {
+  const s = (raw.sections ?? {}) as Record<string, unknown>;
+  const read = (key: string) => stripFormJunk(str(s[key]));
+  return {
+    intake: read("intake"),
+    memo: read("memo"),
+    evaluationComments: read("evaluation_comments"),
+    medicalTreatments: read("medical_treatments"),
+    kennelRounds: read("in_kennel_behavior_rounds"),
+    biteHistory: read("bite_history"),
+  };
+}
+
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
@@ -149,7 +241,7 @@ function toDog(raw: RawDog, bios: Record<string, Bio>): Dog | null {
     photo: raw.photo_file ? `${PHOTO_BASE}/${id}.jpg` : null,
     detailUrl: str(raw.detail_url),
     bio: bios[id] ?? null,
-    // `sections` is deliberately not mapped. Internal only.
+    sections: sectionsOf(raw),
   };
 }
 
@@ -184,7 +276,7 @@ function isDog(raw: RawDog): boolean {
  * to the top on the next hourly import, with nobody having to remember to undo
  * anything. That is the whole reason not to store it.
  */
-export function hasSomeone(dog: Dog): boolean {
+export function hasSomeone(dog: { status: string | null }): boolean {
   return /PENDING/i.test(dog.status ?? "");
 }
 
