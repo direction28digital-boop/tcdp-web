@@ -75,6 +75,15 @@ export type DogFeed = {
     saved: number;
     urgentThisWeek: number;
     nextDeadline: string | null;
+    /**
+     * Days until that deadline, never negative.
+     *
+     * A dog whose county date has passed and who still has nobody is the most
+     * urgent dog on the list, not a data error. But "-2 days until the next
+     * deadline" reads as a broken site, and counting down past zero implies
+     * there is still runway. Floored at 0: time is up, which is the truth.
+     */
+    nextDeadlineDays: number | null;
   };
 };
 
@@ -227,6 +236,11 @@ function shape(
     (d) => d.daysLeft !== null && d.daysLeft <= 7,
   ).length;
 
+  // Dogs already spoken for are excluded here too. The next deadline that
+  // matters is the next one nobody is coming for. `needSomeone` inherits the
+  // deadline sort from `active`, so the first with a date is the soonest.
+  const nextUp = needSomeone.find((d) => d.deadline);
+
   return {
     fetchedAt: raw.fetched_at ?? "",
     live,
@@ -242,7 +256,11 @@ function shape(
       adopted,
       saved: transferred + adopted,
       urgentThisWeek,
-      nextDeadline: needSomeone.find((d) => d.deadline)?.deadline ?? null,
+      nextDeadline: nextUp?.deadline ?? null,
+      nextDeadlineDays:
+        nextUp?.daysLeft === null || nextUp?.daysLeft === undefined
+          ? null
+          : Math.max(0, nextUp.daysLeft),
     },
   };
 }
@@ -359,7 +377,10 @@ export function formatDeadline(deadline: string | null): string {
 
 export function daysLeftLabel(daysLeft: number | null): string {
   if (daysLeft === null) return "Deadline not posted";
-  if (daysLeft < 0) return "Deadline passed";
+  // Not "deadline passed". Said about a dog we are asking a stranger to foster,
+  // that reads as "you are too late" and ends the conversation. The dog is still
+  // on the list and still has nobody, which is the opposite of too late.
+  if (daysLeft < 0) return "Out of time";
   if (daysLeft === 0) return "Deadline today";
   if (daysLeft === 1) return "1 day left";
   return `${daysLeft} days left`;

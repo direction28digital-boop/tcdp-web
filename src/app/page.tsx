@@ -14,7 +14,6 @@ export default async function HomePage() {
   const { active, stats } = await getDogs();
   const featured = active.slice(0, 5);
   const adoptableNow = active.filter((d) => !d.nho).length;
-  const nextDeadlineDays = active.find((d) => d.daysLeft !== null)?.daysLeft;
 
   return (
     <>
@@ -97,8 +96,8 @@ export default async function HomePage() {
               [stats.waiting, "still need somebody right now"],
               [stats.saved, "got out this week"],
               [
-                nextDeadlineDays ?? 0,
-                nextDeadlineDays === 1
+                stats.nextDeadlineDays ?? 0,
+                stats.nextDeadlineDays === 1
                   ? "day until the next deadline"
                   : "days until the next deadline",
               ],

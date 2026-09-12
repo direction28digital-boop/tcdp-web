@@ -1,81 +1,104 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
+import { TeamNav } from "@/components/team/TeamNav";
 import { requireTeam } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ApplicationStatus } from "@/lib/supabase/database.types";
-import { StatusPill } from "@/components/team/StatusPill";
+import {
+  daysLeftLabel,
+  formatAge,
+  formatBreed,
+  getDogs,
+  hasSomeone,
+  type Dog,
+} from "@/lib/dogs";
 
 export const metadata: Metadata = {
-  title: "Applications",
+  title: "Needs attention",
   robots: { index: false, follow: false },
 };
 
-type Row = {
+/** A dog cannot leave the E-list without a person, so a person is the unit of urgency. */
+const URGENT_DAYS = 2;
+
+type PendingApp = {
   id: string;
-  status: ApplicationStatus;
   submitted_at: string | null;
-  updated_at: string;
-  housing: string | null;
-  has_dogs: boolean | null;
-  has_cats: boolean | null;
-  has_kids: boolean | null;
-  zip: string | null;
-  profiles: { full_name: string | null; email: string; phone: string | null } | null;
+  dog_interest: "specific" | "any" | null;
+  dog_raw: string | null;
+  dog_id: string | null;
+  profiles: { full_name: string | null; email: string } | null;
 };
 
-const FILTERS: { key: string; label: string; statuses: ApplicationStatus[] }[] = [
-  { key: "new", label: "Waiting on us", statuses: ["submitted"] },
-  { key: "approved", label: "Approved", statuses: ["approved"] },
-  { key: "denied", label: "Not approved", statuses: ["denied"] },
-  { key: "draft", label: "Started, not sent", statuses: ["draft"] },
-  { key: "all", label: "Everyone", statuses: [] },
-];
+function who(app: PendingApp): string {
+  return app.profiles?.full_name?.trim() || app.profiles?.email || "Someone";
+}
 
-export default async function TeamPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ show?: string; q?: string }>;
-}) {
+function waitingSince(iso: string | null): string {
+  if (!iso) return "just now";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "since yesterday";
+  return `for ${days} days`;
+}
+
+export default async function NeedsAttentionPage() {
   const viewer = await requireTeam();
-  const params = await searchParams;
-  const show = FILTERS.find((f) => f.key === params.show) ?? FILTERS[0];
-  const q = (params.q ?? "").trim();
-
   const supabase = await createClient();
-  let query = supabase
-    .from("applications")
-    .select(
-      // The FK must be named. `applications` points at `profiles` TWICE, through
-      // profile_id and through reviewed_by, so a bare `profiles(...)` is
-      // ambiguous and PostgREST refuses the embed outright rather than guessing.
-      "id, status, submitted_at, updated_at, housing, has_dogs, has_cats, has_kids, zip, profiles!applications_profile_id_fkey(full_name, email, phone)",
-    )
-    .eq("org_id", viewer.org.id)
-    .order("submitted_at", { ascending: false, nullsFirst: false })
-    .limit(200);
 
-  if (show.statuses.length > 0) query = query.in("status", show.statuses);
-
-  const { data, error } = await query;
-  // The applicant never sees this, but a volunteer reporting "it says it could
-  // not load" needs somebody to be able to find out why.
-  if (error) console.error("[team] applications query failed", error);
-  const rows = (data ?? []) as unknown as Row[];
-
-  // Search runs here rather than in Postgres because the name lives on the
-  // joined profile, and filtering an embedded resource server-side would drop
-  // rows rather than filter them. Two hundred rows is nothing to scan.
-  const needle = q.toLowerCase();
-  const visible = needle
-    ? rows.filter((r) =>
-        [r.profiles?.full_name, r.profiles?.email, r.zip]
-          .filter(Boolean)
-          .some((v) => (v as string).toLowerCase().includes(needle)),
+  const [{ active }, { data, error }] = await Promise.all([
+    getDogs(),
+    supabase
+      .from("applications")
+      .select(
+        // Named FK: applications points at profiles twice.
+        "id, submitted_at, dog_interest, dog_raw, dog_id, profiles!applications_profile_id_fkey(full_name, email)",
       )
-    : rows;
+      .eq("org_id", viewer.org.id)
+      .eq("status", "submitted")
+      .order("submitted_at", { ascending: true, nullsFirst: false })
+      .limit(300),
+  ]);
 
-  const waiting = rows.filter((r) => r.status === "submitted").length;
+  if (error) console.error("[team] needs-attention query failed", error);
+  const apps = (data ?? []) as unknown as PendingApp[];
+
+  // ── Group 1 ───────────────────────────────────────────────────────────────
+  // A dog with somebody already waiting on us. This is the top of the list and
+  // it is not close: the foster exists, the dog is still on the E-list, and the
+  // only thing standing between them is a volunteer opening the application.
+  const byDog = new Map<string, PendingApp[]>();
+  for (const app of apps) {
+    if (!app.dog_id) continue;
+    byDog.set(app.dog_id, [...(byDog.get(app.dog_id) ?? []), app]);
+  }
+  const claimed = active
+    .filter((d) => byDog.has(d.id))
+    .map((dog) => ({ dog, apps: byDog.get(dog.id)! }));
+
+  // ── Group 2 ───────────────────────────────────────────────────────────────
+  // Out of time or nearly, and nobody has come. Dogs already spoken for are out
+  // of this group entirely: a TRANSFER PENDING dog with one day left does not
+  // need a volunteer's attention today, and putting them here would spend it.
+  const outOfTime = active.filter(
+    (d) =>
+      !hasSomeone(d) &&
+      !byDog.has(d.id) &&
+      d.daysLeft !== null &&
+      d.daysLeft <= URGENT_DAYS,
+  );
+
+  // ── Group 3 ───────────────────────────────────────────────────────────────
+  // Somebody typed a dog's name and we could not work out who they meant, so
+  // the match needs human eyes. Left alone this is the quietest way to lose a
+  // placement: the application looks processed, and the dog it was for never
+  // hears about it.
+  const unmatched = apps.filter(
+    (a) => a.dog_interest === "specific" && !a.dog_id,
+  );
+
+  const total = claimed.length + outOfTime.length + unmatched.length;
 
   return (
     <>
@@ -84,7 +107,7 @@ export default async function TeamPage({
         <div className="mx-auto max-w-[1100px] px-6 py-10">
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h1 className="font-display text-4xl font-extrabold tracking-tight text-ink">
-              Applications
+              Needs attention
             </h1>
             <p className="text-ink-soft">
               Signed in as{" "}
@@ -95,146 +118,203 @@ export default async function TeamPage({
             </p>
           </div>
 
-          {show.key === "new" && waiting > 0 ? (
-            <p className="mt-4 text-lg text-ink-soft">
-              {waiting} {waiting === 1 ? "person is" : "people are"} waiting to
-              hear from somebody.
-            </p>
+          <p className="mt-3 max-w-2xl text-lg leading-relaxed text-ink-soft">
+            Our list, not the county&rsquo;s. Everything here is waiting on
+            somebody in this group.
+          </p>
+
+          <div className="mt-8">
+            <TeamNav current="/team" counts={{ "/team": total }} />
+          </div>
+
+          {total === 0 ? (
+            <div className="mt-10 rounded-2xl bg-surface p-10 text-center">
+              <p className="font-display text-2xl font-extrabold text-ink">
+                Nothing is waiting on us.
+              </p>
+              <p className="mt-2 text-ink-soft">
+                Every application has been looked at and no dog is down to their
+                last two days without somebody. Check back after the next import.
+              </p>
+            </div>
           ) : null}
 
-          <form className="mt-8 flex flex-wrap items-center gap-3" action="/team">
-            <input type="hidden" name="show" value={show.key} />
-            <label htmlFor="q" className="sr-only">
-              Search by name, email or zip
-            </label>
-            <input
-              id="q"
-              name="q"
-              defaultValue={q}
-              placeholder="Name, email or zip"
-              className="w-full max-w-[320px] rounded-xl border border-line bg-surface px-4 py-2.5 text-ink placeholder:text-ink-soft/50"
-            />
-            <button
-              type="submit"
-              className="rounded-full border-2 border-ink px-5 py-2 font-display text-xs font-bold tracking-wide text-ink uppercase hover:bg-ink hover:text-cream"
+          {/* ── Somebody is waiting ────────────────────────────────────── */}
+          {claimed.length > 0 ? (
+            <Section
+              title="Somebody applied for these dogs"
+              note="The foster is already here. Open the application."
+              count={claimed.length}
+              tone="sunset"
             >
-              Search
-            </button>
-            {q ? (
-              <Link
-                href={`/team?show=${show.key}`}
-                className="text-sm font-semibold text-sunset underline underline-offset-4"
-              >
-                Clear
-              </Link>
-            ) : null}
-          </form>
-
-          <nav className="mt-6 flex flex-wrap gap-2" aria-label="Filter">
-            {FILTERS.map((f) => (
-              <Link
-                key={f.key}
-                href={`/team?show=${f.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-                aria-current={f.key === show.key ? "page" : undefined}
-                className={
-                  f.key === show.key
-                    ? "rounded-full bg-ink px-4 py-2 font-display text-xs font-bold tracking-wide text-cream uppercase"
-                    : "rounded-full bg-surface px-4 py-2 font-display text-xs font-bold tracking-wide text-ink-soft uppercase hover:bg-cream-deep"
-                }
-              >
-                {f.label}
-              </Link>
-            ))}
-          </nav>
-
-          {error ? (
-            <p
-              className="mt-10 rounded-xl border border-sunset/30 bg-sunset-soft px-5 py-4 text-sunset-deep"
-              role="alert"
-            >
-              Could not load applications just now. Refresh in a moment, and if
-              it keeps happening tell Dee.
-            </p>
-          ) : visible.length === 0 ? (
-            <EmptyState hasAny={rows.length > 0} searched={q.length > 0} />
-          ) : (
-            <ul className="mt-8 space-y-3">
-              {visible.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={`/team/${r.id}`}
-                    className="block rounded-2xl bg-surface p-5 shadow-[0_1px_10px_rgba(17,17,17,0.05)] hover:shadow-[0_2px_16px_rgba(17,17,17,0.1)]"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="font-display text-xl font-bold text-ink">
-                        {r.profiles?.full_name || r.profiles?.email || "No name yet"}
-                      </span>
-                      <StatusPill status={r.status} />
+              <ul className="grid gap-4">
+                {claimed.map(({ dog, apps }) => (
+                  <li key={dog.id}>
+                    <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-surface p-4 shadow-[0_2px_14px_rgba(17,17,17,0.06)]">
+                      <DogThumb dog={dog} />
+                      <div className="min-w-[200px] flex-1">
+                        <p className="font-display text-lg font-extrabold text-ink">
+                          <Link
+                            href={`/dogs/${dog.id}`}
+                            className="hover:underline"
+                          >
+                            {dog.name}
+                          </Link>{" "}
+                          <span className="text-sm font-semibold text-ink-soft/70">
+                            {dog.id}
+                          </span>
+                        </p>
+                        <p className="text-sm text-ink-soft">
+                          {[formatAge(dog.age), formatBreed(dog.breed), dog.shelter]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        <p className="mt-1 font-display text-xs font-bold tracking-wide text-sunset uppercase">
+                          {daysLeftLabel(dog.daysLeft)}
+                        </p>
+                      </div>
+                      <ul className="flex flex-col gap-2">
+                        {apps.map((app) => (
+                          <li key={app.id}>
+                            <Link
+                              href={`/team/applications/${app.id}`}
+                              className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 font-display text-xs font-bold tracking-wide text-cream uppercase hover:bg-sunset"
+                            >
+                              {who(app)} — waiting {waitingSince(app.submitted_at)}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <p className="mt-1 text-sm text-ink-soft">
-                      {r.profiles?.email}
-                      {r.profiles?.phone ? ` · ${r.profiles.phone}` : ""}
-                      {r.zip ? ` · ${r.zip}` : ""}
-                    </p>
-                    <p className="mt-3 text-sm text-ink-soft">
-                      {describe(r)} ·{" "}
-                      {r.submitted_at
-                        ? `Sent ${formatDate(r.submitted_at)}`
-                        : `Started ${formatDate(r.updated_at)}`}
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+
+          {/* ── Out of time ────────────────────────────────────────────── */}
+          {outOfTime.length > 0 ? (
+            <Section
+              title="Down to the wire with nobody"
+              note={`${URGENT_DAYS} days or less and no application. These are the ones to film and post today.`}
+              count={outOfTime.length}
+              tone="rust"
+            >
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {outOfTime.map((dog) => (
+                  <li
+                    key={dog.id}
+                    className="flex items-center gap-4 rounded-2xl bg-surface p-4 shadow-[0_2px_14px_rgba(17,17,17,0.06)]"
+                  >
+                    <DogThumb dog={dog} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-lg font-extrabold text-ink">
+                        <Link href={`/dogs/${dog.id}`} className="hover:underline">
+                          {dog.name}
+                        </Link>
+                      </p>
+                      <p className="truncate text-sm text-ink-soft">
+                        {[dog.shelter, dog.kennel ? `Kennel ${dog.kennel}` : null]
+                          .filter(Boolean)
+                          .join(" · ") || dog.id}
+                      </p>
+                      <p className="mt-1 font-display text-xs font-bold tracking-wide text-rust uppercase">
+                        {daysLeftLabel(dog.daysLeft)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+
+          {/* ── Unmatched ──────────────────────────────────────────────── */}
+          {unmatched.length > 0 ? (
+            <Section
+              title="We could not tell which dog they meant"
+              note="They named a dog we could not find on today's list. Read it and work out who they mean before the answer stops mattering."
+              count={unmatched.length}
+              tone="gold"
+            >
+              <ul className="grid gap-3">
+                {unmatched.map((app) => (
+                  <li key={app.id}>
+                    <Link
+                      href={`/team/applications/${app.id}`}
+                      className="flex flex-wrap items-baseline justify-between gap-3 rounded-2xl bg-surface p-4 shadow-[0_2px_14px_rgba(17,17,17,0.06)] hover:bg-cream-deep"
+                    >
+                      <span className="font-display text-lg font-extrabold text-ink">
+                        {who(app)}
+                      </span>
+                      <span className="text-ink-soft">
+                        asked for{" "}
+                        <span className="font-semibold text-ink">
+                          &ldquo;{app.dog_raw || "a dog they did not name"}&rdquo;
+                        </span>
+                      </span>
+                      <span className="font-display text-xs font-bold tracking-wide text-ink-soft uppercase">
+                        Waiting {waitingSince(app.submitted_at)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
         </div>
       </main>
     </>
   );
 }
 
-function describe(r: Row): string {
-  const bits: string[] = [];
-  if (r.housing) bits.push(r.housing === "own" ? "Owns" : r.housing === "rent" ? "Rents" : "Lives with family");
-  if (r.has_dogs) bits.push("has dogs");
-  if (r.has_cats) bits.push("has cats");
-  if (r.has_kids) bits.push("kids at home");
-  return bits.length > 0 ? bits.join(" · ") : "No details yet";
-}
+const TONES: Record<string, string> = {
+  sunset: "bg-sunset text-white",
+  rust: "bg-rust text-white",
+  gold: "bg-gold-soft text-rust",
+};
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function EmptyState({ hasAny, searched }: { hasAny: boolean; searched: boolean }) {
-  if (searched) {
-    return (
-      <p className="mt-10 rounded-2xl bg-surface p-8 text-lg text-ink-soft">
-        Nobody matches that. Try part of a name, or an email address.
-      </p>
-    );
-  }
-  // The honest empty state. An empty screen on day one looks broken, and
-  // somebody will assume the applications were lost.
+function Section({
+  title,
+  note,
+  count,
+  tone,
+  children,
+}: {
+  title: string;
+  note: string;
+  count: number;
+  tone: keyof typeof TONES | string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mt-10 rounded-2xl bg-surface p-8">
-      <h2 className="font-display text-2xl font-bold text-ink">
-        {hasAny ? "Nothing in this list" : "No applications here yet"}
-      </h2>
-      <p className="mt-3 text-lg leading-relaxed text-ink-soft">
-        {hasAny
-          ? "Try another filter above. Everyone is under Everyone."
-          : "This is the new application, so it starts empty. It fills up as people apply through the site."}
-      </p>
-      {!hasAny ? (
-        <p className="mt-3 leading-relaxed text-ink-soft">
-          The older applications are still in WordPress at dogfoster.org. They
-          are not lost and nothing here deleted them.
-        </p>
+    <section className="mt-10">
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={`inline-flex min-w-8 items-center justify-center rounded-full px-3 py-1 font-display text-sm font-black tabular-nums ${TONES[tone] ?? TONES.gold}`}
+        >
+          {count}
+        </span>
+        <h2 className="font-display text-2xl font-extrabold text-ink">
+          {title}
+        </h2>
+      </div>
+      <p className="mt-2 max-w-3xl text-ink-soft">{note}</p>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function DogThumb({ dog }: { dog: Dog }) {
+  return (
+    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-cream-deep">
+      {dog.photo ? (
+        <Image
+          src={dog.photo}
+          alt=""
+          fill
+          sizes="64px"
+          className="object-cover"
+        />
       ) : null}
     </div>
   );

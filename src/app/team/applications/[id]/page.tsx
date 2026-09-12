@@ -56,7 +56,7 @@ export default async function ApplicationDetail({
       <main id="main" className="min-h-screen bg-cream">
         <div className="mx-auto max-w-[900px] px-6 py-10">
           <Link
-            href="/team"
+            href="/team/applications"
             className="font-semibold text-sunset underline underline-offset-4 hover:text-sunset-deep"
           >
             Back to applications

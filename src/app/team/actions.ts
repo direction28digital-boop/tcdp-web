@@ -43,7 +43,8 @@ export async function setStatus(
   }
 
   revalidatePath("/team");
-  revalidatePath(`/team/${applicationId}`);
+  revalidatePath("/team/applications");
+  revalidatePath(`/team/applications/${applicationId}`);
 }
 
 export async function addNote(
@@ -68,5 +69,5 @@ export async function addNote(
     return { error: "That note did not save. Copy it somewhere before you retry." };
   }
 
-  revalidatePath(`/team/${applicationId}`);
+  revalidatePath(`/team/applications/${applicationId}`);
 }
