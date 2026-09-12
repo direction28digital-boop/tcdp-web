@@ -32,6 +32,29 @@ export function DeadlineChip({
   );
 }
 
+/**
+ * Why the county put this dog on the list, in the county's word.
+ *
+ * The reason people were withdrawing at the phone screening is that nothing
+ * before it said what they were taking on. A card is where most of them start,
+ * and it was saying nothing at all about this — so somebody could go from a
+ * photo to a filled-in application without ever learning the dog is listed for
+ * behavior.
+ *
+ * Their word, not ours, and not glossed: the county publishes "NHO Priority:
+ * Behavior" and "Priority: Medical" and no definitions beyond that, so inventing
+ * an explanation would be putting a claim in the shelter's mouth. This is a
+ * signpost to the record, not a verdict on the dog.
+ */
+export function ReasonBadge({ reason }: { reason: string | null }) {
+  if (!reason) return null;
+  return (
+    <span className="inline-flex items-center rounded-full border border-ink/20 bg-white px-3 py-1 font-display text-xs font-bold tracking-wide text-ink-soft uppercase">
+      County priority: {reason}
+    </span>
+  );
+}
+
 /** New Hope Only dogs need a partner rescue. The other dogs can be adopted directly. */
 export function RouteBadge({ nho }: { nho: boolean }) {
   return nho ? (
@@ -113,6 +136,7 @@ export function DogCard({ dog }: { dog: Dog }) {
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
           <RouteBadge nho={dog.nho} />
+          <ReasonBadge reason={dog.reason} />
         </div>
       </div>
     </article>
