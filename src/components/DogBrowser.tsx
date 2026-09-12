@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DogCard } from "@/components/DogCard";
-import type { Dog } from "@/lib/dogs";
+import { hasSomeone, type Dog } from "@/lib/dogs";
 
 type Filter = "all" | "nho" | "adoptable" | "soonest";
 
@@ -14,6 +14,9 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 export function DogBrowser({ dogs }: { dogs: Dog[] }) {
+  // Counted here rather than passed in, so this component stays honest even if
+  // it is ever handed a filtered list.
+  const spokenFor = dogs.filter(hasSomeone).length;
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -80,7 +83,9 @@ export function DogBrowser({ dogs }: { dogs: Dog[] }) {
 
       <p aria-live="polite" className="mt-8 text-lg font-semibold text-ink">
         {results.length === dogs.length
-          ? `${dogs.length} dogs on the list`
+          ? spokenFor > 0
+            ? `${dogs.length - spokenFor} still need somebody, ${spokenFor} already have someone coming`
+            : `${dogs.length} dogs on the list`
           : `${results.length} of ${dogs.length} dogs`}
       </p>
 

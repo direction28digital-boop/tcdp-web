@@ -65,12 +65,25 @@ export type DogFeed = {
   active: Dog[];
   resolved: Dog[];
   stats: {
+    /** Dogs still needing somebody. NOT the length of `active`. */
     waiting: number;
+    /** Everything on the county list, including dogs already spoken for. */
+    onList: number;
+    spokenFor: number;
     transferred: number;
     adopted: number;
     saved: number;
     urgentThisWeek: number;
     nextDeadline: string | null;
+    /**
+     * Days until that deadline, never negative.
+     *
+     * A dog whose county date has passed and who still has nobody is the most
+     * urgent dog on the list, not a data error. But "-2 days until the next
+     * deadline" reads as a broken site, and counting down past zero implies
+     * there is still runway. Floored at 0: time is up, which is the truth.
+     */
+    nextDeadlineDays: number | null;
   };
 };
 
@@ -158,6 +171,37 @@ function isDog(raw: RawDog): boolean {
   return !NOT_A_DOG.test(String(raw.breed ?? ""));
 }
 
+/**
+ * Somebody has already stepped up for this dog.
+ *
+ * A dog cannot leave the E-list without a foster or adopter, so a PENDING
+ * status is the county telling us one has been found: TRANSFER PENDING for a
+ * rescue or foster, RTO PENDING for an owner reclaiming. Either way this dog is
+ * not the one that needs a stranger to see them today.
+ *
+ * Deliberately read live from the feed rather than tracked here. If the
+ * placement falls through, the county clears the status and the dog comes back
+ * to the top on the next hourly import, with nobody having to remember to undo
+ * anything. That is the whole reason not to store it.
+ */
+export function hasSomeone(dog: Dog): boolean {
+  return /PENDING/i.test(dog.status ?? "");
+}
+
+/**
+ * Dogs still needing somebody come first, each group by deadline.
+ *
+ * Sinking rather than hiding, on purpose: the team still needs to see them, a
+ * pending transfer can fall through, and a list that quietly drops dogs teaches
+ * people not to trust it.
+ */
+function byNeed(a: Dog, b: Dog): number {
+  const aPending = hasSomeone(a);
+  const bPending = hasSomeone(b);
+  if (aPending !== bPending) return aPending ? 1 : -1;
+  return byDeadline(a, b);
+}
+
 function byDeadline(a: Dog, b: Dog): number {
   if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
   if (a.deadline) return -1;
@@ -174,7 +218,7 @@ function shape(
     .filter(isDog)
     .map((raw) => toDog(raw, bios))
     .filter((d): d is Dog => d !== null)
-    .sort(byDeadline);
+    .sort(byNeed);
 
   const resolved = (raw.resolved ?? [])
     .filter(isDog)
@@ -183,9 +227,19 @@ function shape(
 
   const transferred = resolved.filter((d) => d.status === "TRANSFERRED").length;
   const adopted = resolved.filter((d) => d.status === "ADOPTED").length;
-  const urgentThisWeek = active.filter(
+
+  // Counting is where this matters most. "N dogs need out this week" has to
+  // mean N dogs with nobody, or the number is a lie that makes the situation
+  // look worse than it is and quietly wastes a volunteer's attention.
+  const needSomeone = active.filter((d) => !hasSomeone(d));
+  const urgentThisWeek = needSomeone.filter(
     (d) => d.daysLeft !== null && d.daysLeft <= 7,
   ).length;
+
+  // Dogs already spoken for are excluded here too. The next deadline that
+  // matters is the next one nobody is coming for. `needSomeone` inherits the
+  // deadline sort from `active`, so the first with a date is the soonest.
+  const nextUp = needSomeone.find((d) => d.deadline);
 
   return {
     fetchedAt: raw.fetched_at ?? "",
@@ -193,12 +247,20 @@ function shape(
     active,
     resolved,
     stats: {
-      waiting: active.length,
+      /** Dogs still needing somebody. NOT the length of `active`. */
+      waiting: needSomeone.length,
+      /** Everything on the county list, including dogs already spoken for. */
+      onList: active.length,
+      spokenFor: active.length - needSomeone.length,
       transferred,
       adopted,
       saved: transferred + adopted,
       urgentThisWeek,
-      nextDeadline: active.find((d) => d.deadline)?.deadline ?? null,
+      nextDeadline: nextUp?.deadline ?? null,
+      nextDeadlineDays:
+        nextUp?.daysLeft === null || nextUp?.daysLeft === undefined
+          ? null
+          : Math.max(0, nextUp.daysLeft),
     },
   };
 }
@@ -315,7 +377,10 @@ export function formatDeadline(deadline: string | null): string {
 
 export function daysLeftLabel(daysLeft: number | null): string {
   if (daysLeft === null) return "Deadline not posted";
-  if (daysLeft < 0) return "Deadline passed";
+  // Not "deadline passed". Said about a dog we are asking a stranger to foster,
+  // that reads as "you are too late" and ends the conversation. The dog is still
+  // on the list and still has nobody, which is the opposite of too late.
+  if (daysLeft < 0) return "Out of time";
   if (daysLeft === 0) return "Deadline today";
   if (daysLeft === 1) return "1 day left";
   return `${daysLeft} days left`;

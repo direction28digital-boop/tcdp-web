@@ -5,6 +5,7 @@ import {
   deadlineTone,
   formatAge,
   formatBreed,
+  hasSomeone,
   type Dog,
 } from "@/lib/dogs";
 
@@ -65,10 +66,20 @@ export function DogCard({ dog }: { dog: Dog }) {
             No photo posted by the shelter yet
           </div>
         )}
-        <div className="absolute top-3 left-3">
-          <DeadlineChip daysLeft={dog.daysLeft} />
-        </div>
-        {dog.status ? (
+        {/* No deadline chip once somebody is coming. A dog with a foster lined
+            up was showing "DEADLINE PASSED" next to "TRANSFER PENDING", which
+            reads to a stranger as "this dog is already dead". The deadline is
+            not the story any more once the dog is spoken for. */}
+        {hasSomeone(dog) ? (
+          <div className="absolute top-3 left-3 rounded-full bg-sage px-3 py-1.5 font-display text-xs font-bold tracking-wide text-white uppercase">
+            Someone is coming
+          </div>
+        ) : (
+          <div className="absolute top-3 left-3">
+            <DeadlineChip daysLeft={dog.daysLeft} />
+          </div>
+        )}
+        {dog.status && !hasSomeone(dog) ? (
           <div className="absolute right-3 bottom-3 rounded-full bg-ink/85 px-3 py-1 font-display text-xs font-bold tracking-wide text-cream uppercase">
             {dog.status}
           </div>

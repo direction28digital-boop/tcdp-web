@@ -14,7 +14,6 @@ export default async function HomePage() {
   const { active, stats } = await getDogs();
   const featured = active.slice(0, 5);
   const adoptableNow = active.filter((d) => !d.nho).length;
-  const nextDeadlineDays = active.find((d) => d.daysLeft !== null)?.daysLeft;
 
   return (
     <>
@@ -94,11 +93,11 @@ export default async function HomePage() {
         <section className="bg-cream py-16">
           <dl className="mx-auto grid max-w-[1180px] gap-10 px-6 text-center sm:grid-cols-2 lg:grid-cols-4">
             {[
-              [stats.waiting, "on the priority list right now"],
+              [stats.waiting, "still need somebody right now"],
               [stats.saved, "got out this week"],
               [
-                nextDeadlineDays ?? 0,
-                nextDeadlineDays === 1
+                stats.nextDeadlineDays ?? 0,
+                stats.nextDeadlineDays === 1
                   ? "day until the next deadline"
                   : "days until the next deadline",
               ],
@@ -148,7 +147,7 @@ export default async function HomePage() {
                 href="/dogs"
                 className="inline-block rounded-full border-2 border-ink px-8 py-4 font-display text-base font-bold tracking-wide text-ink uppercase transition-colors hover:bg-ink hover:text-cream"
               >
-                See all {stats.waiting} dogs
+                See all {stats.onList} dogs
               </Link>
             </div>
           </div>
