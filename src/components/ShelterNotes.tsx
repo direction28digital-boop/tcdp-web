@@ -9,24 +9,45 @@ import type { Sections } from "@/lib/dogs";
  * medical log and the kennel rounds sit lower because they are long, clinical and
  * matter to fewer readers. Nothing is rewritten, trimmed or paraphrased.
  *
- * Everything is a <details>, closed by default. Median evaluation comments run
- * 3,600 characters and the longest is 12,500 — open on a phone that is a wall of
- * text that buries the photo and the deadline. Closed, the reader chooses.
+ * The memo and the behaviour evaluations open on arrival; the long clinical
+ * blocks stay closed. Dee: "we need to disclose it all so people know up front
+ * what they are getting into." A disclosure somebody has to go looking for is
+ * the shape of hiding something — but median evaluation comments run 3,600
+ * characters and the longest is 12,500, so opening the medical log and the
+ * kennel scores too would bury the photo and the deadline under clinical prose
+ * and nobody would reach the part that matters.
  */
 const LONG_ENOUGH_TO_SEND_THEM_ON = 2500;
 
-type Block = { key: keyof Sections; title: string; note?: string };
+type Block = {
+  key: keyof Sections;
+  title: string;
+  note?: string;
+  /**
+   * Open on arrival.
+   *
+   * Dee: "we need to disclose it all so people know up front what they are
+   * getting into." Collapsing the two blocks that carry the substance would have
+   * made this page a disclosure people had to go looking for, which is the shape
+   * of hiding something. The memo and the evaluations are open; the medical log,
+   * the kennel scores and the dates stay closed because they are long, clinical,
+   * and not what anybody is deciding on.
+   */
+  open?: boolean;
+};
 
 const BLOCKS: Block[] = [
   {
     key: "memo",
     title: "Shelter memo and intake",
     note: "Why the county put this dog on the priority list, and how they arrived.",
+    open: true,
   },
   {
     key: "evaluationComments",
     title: "Behavior evaluations",
     note: "Written by handlers, dated, in their words.",
+    open: true,
   },
   {
     key: "biteHistory",
@@ -75,9 +96,11 @@ export function ShelterNotes({
         What the shelter wrote
       </h2>
       <p className="mt-2 max-w-2xl leading-relaxed text-ink-soft">
-        Straight from {dogName}&rsquo;s Maricopa County record, word for word. We
-        have not softened it and we have not added to it. Anything in our own
-        voice is labelled as ours.
+        Straight from {dogName}&rsquo;s Maricopa County record, word for word —
+        all of it, including bite history and anything the shelter flagged about
+        behavior. We have not softened it and we have not added to it. You should
+        know what you are taking on before you apply, not after. Anything written
+        in our own voice is labelled as ours.
       </p>
 
       <div className="mt-6 flex flex-col gap-3">
@@ -91,6 +114,7 @@ export function ShelterNotes({
           return (
             <details
               key={block.key}
+              open={block.open}
               className="group rounded-2xl bg-cream px-5 py-4 open:bg-cream-deep/40"
             >
               <summary className="flex cursor-pointer items-center justify-between gap-4 font-display text-sm font-bold tracking-wide text-ink uppercase marker:content-['']">

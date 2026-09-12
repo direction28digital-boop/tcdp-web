@@ -80,6 +80,8 @@ export type Dog = {
   daysLeft: number | null;
   /** County status: null when active, otherwise TRANSFER PENDING / RTO PENDING / TRANSFERRED / ADOPTED. */
   status: string | null;
+  /** MCACC's own behaviour rating, their word, or null when we could not trust the parse. */
+  level: string | null;
   resolved: boolean;
   photo: string | null;
   detailUrl: string | null;
@@ -204,6 +206,31 @@ function sectionsOf(raw: RawDog): Sections {
   };
 }
 
+/**
+ * The county's behaviour rating, only when we are sure we read it.
+ *
+ * MCACC rates animals with a colour and it is the most up-front thing on the
+ * record — but the importer mis-parses it on the small dogs. Measured on the live
+ * feed: 2 of 37 come through as the literal string "Weight", both under six
+ * pounds (Biggie Smalls is 2.7lb at seven weeks), because a missing field on the
+ * detail page slides the column and the scraper grabs the next label instead.
+ *
+ * Showing "Level: Weight" as a behaviour rating on a page whose entire purpose is
+ * now honest disclosure would undercut the thing it is trying to build. So an
+ * unrecognised value renders as nothing, and the county page link covers it.
+ *
+ * Worth fixing in the importer; this guard stays regardless, because the day the
+ * county adds a colour is the day this would start printing garbage again.
+ */
+const COUNTY_LEVELS = ["GREEN", "YELLOW", "ORANGE", "PURPLE", "RED", "BLUE"];
+
+function levelOf(raw: unknown): string | null {
+  const value = str(raw);
+  if (!value) return null;
+  const upper = value.toUpperCase();
+  return COUNTY_LEVELS.includes(upper) ? upper : null;
+}
+
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
@@ -237,6 +264,7 @@ function toDog(raw: RawDog, bios: Record<string, Bio>): Dog | null {
     deadline,
     daysLeft: daysUntil(deadline),
     status: str(raw.status),
+    level: levelOf(raw.level),
     resolved: raw.resolved === true,
     photo: raw.photo_file ? `${PHOTO_BASE}/${id}.jpg` : null,
     detailUrl: str(raw.detail_url),
