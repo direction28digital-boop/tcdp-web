@@ -42,8 +42,12 @@ export default async function DogsPage() {
             {live ? (
               <>
                 <p className="mt-6 max-w-3xl text-lg leading-relaxed text-ink-soft">
-                  These {stats.waiting} dogs are on the Maricopa County priority
-                  list today. The next deadline is{" "}
+                  {stats.waiting} dogs on the Maricopa County priority list
+                  still need somebody today
+                  {stats.spokenFor > 0
+                    ? `, and ${stats.spokenFor} already have someone coming, so we have moved those to the end`
+                    : ""}
+                  . The next deadline is{" "}
                   <strong className="text-ink">
                     {formatDeadline(stats.nextDeadline)}
                   </strong>

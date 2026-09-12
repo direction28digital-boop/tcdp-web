@@ -8,6 +8,7 @@ import { DeadlineChip, RouteBadge } from "@/components/DogCard";
 import { TornEdge } from "@/components/Shapes";
 import {
   daysLeftLabel,
+  hasSomeone,
   formatAge,
   formatBreed,
   formatDeadline,
@@ -43,6 +44,8 @@ export default async function DogPage({ params }: Params) {
   if (!dog) notFound();
 
   const out = dog.status === "TRANSFERRED" || dog.status === "ADOPTED";
+  // Somebody has stepped up but the dog has not left yet. Not out, not urgent.
+  const spokenFor = !out && hasSomeone(dog);
   const facts = buildFacts(dog);
 
   return (
@@ -82,11 +85,15 @@ export default async function DogPage({ params }: Params) {
                     <span className="inline-flex items-center rounded-full bg-sage px-4 py-1.5 font-display text-xs font-bold tracking-wide text-white uppercase">
                       {dog.status === "ADOPTED" ? "Adopted" : "Out safe"}
                     </span>
+                  ) : spokenFor ? (
+                    <span className="inline-flex items-center rounded-full bg-sage px-4 py-1.5 font-display text-xs font-bold tracking-wide text-white uppercase">
+                      Someone is coming
+                    </span>
                   ) : (
                     <DeadlineChip daysLeft={dog.daysLeft} />
                   )}
                   <RouteBadge nho={dog.nho} />
-                  {dog.status && !out ? (
+                  {dog.status && !out && !spokenFor ? (
                     <span className="inline-flex items-center rounded-full bg-ink px-4 py-1.5 font-display text-xs font-bold tracking-wide text-cream uppercase">
                       {dog.status}
                     </span>
@@ -100,7 +107,14 @@ export default async function DogPage({ params }: Params) {
                   County ID {dog.id}
                 </p>
 
-                {dog.deadline && !out ? (
+                {spokenFor ? (
+                  <p className="mt-6 text-xl leading-relaxed font-semibold text-sage">
+                    Somebody has stepped up for {dog.name} and the shelter is
+                    getting the paperwork done. Nothing is final until they walk
+                    out, so if this falls through {dog.name} comes straight back
+                    to the top of the list.
+                  </p>
+                ) : dog.deadline && !out ? (
                   <p className="mt-6 text-xl leading-relaxed font-semibold text-ink">
                     Deadline: {formatDeadline(dog.deadline)}.
                   </p>
