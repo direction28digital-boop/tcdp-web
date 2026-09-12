@@ -46,7 +46,10 @@ export default async function TeamPage({
   let query = supabase
     .from("applications")
     .select(
-      "id, status, submitted_at, updated_at, housing, has_dogs, has_cats, has_kids, zip, profiles(full_name, email, phone)",
+      // The FK must be named. `applications` points at `profiles` TWICE, through
+      // profile_id and through reviewed_by, so a bare `profiles(...)` is
+      // ambiguous and PostgREST refuses the embed outright rather than guessing.
+      "id, status, submitted_at, updated_at, housing, has_dogs, has_cats, has_kids, zip, profiles!applications_profile_id_fkey(full_name, email, phone)",
     )
     .eq("org_id", viewer.org.id)
     .order("submitted_at", { ascending: false, nullsFirst: false })
@@ -55,6 +58,9 @@ export default async function TeamPage({
   if (show.statuses.length > 0) query = query.in("status", show.statuses);
 
   const { data, error } = await query;
+  // The applicant never sees this, but a volunteer reporting "it says it could
+  // not load" needs somebody to be able to find out why.
+  if (error) console.error("[team] applications query failed", error);
   const rows = (data ?? []) as unknown as Row[];
 
   // Search runs here rather than in Postgres because the name lives on the

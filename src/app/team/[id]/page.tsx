@@ -26,20 +26,25 @@ export default async function ApplicationDetail({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: app }, { data: notes }] = await Promise.all([
+  const [{ data: app, error: appError }, { data: notes }] = await Promise.all([
     supabase
       .from("applications")
-      .select("*, profiles(full_name, email, phone)")
+      // Named FK: see the note in /team. profile_id and reviewed_by both point
+      // at profiles, so the embed has to say which one it means.
+      .select("*, profiles!applications_profile_id_fkey(full_name, email, phone)")
       .eq("id", id)
       .eq("org_id", viewer.org.id)
       .maybeSingle(),
     supabase
       .from("application_notes")
-      .select("id, body, created_at, profiles:author_id(full_name, email)")
+      .select(
+        "id, body, created_at, profiles!application_notes_author_id_fkey(full_name, email)",
+      )
       .eq("application_id", id)
       .order("created_at", { ascending: false }),
   ]);
 
+  if (appError) console.error("[team] application detail query failed", appError);
   if (!app) notFound();
 
   const answers = (app.answers ?? {}) as Answers;
