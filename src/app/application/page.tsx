@@ -5,6 +5,7 @@ import { SwipeHeading, TornEdge } from "@/components/Shapes";
 import { ApplicationForm, type MatchDog } from "@/components/ApplicationForm";
 import { getDogs } from "@/lib/dogs";
 import { getViewer } from "@/lib/auth";
+import type { Answers } from "@/lib/apply-flow";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default async function ApplicationPage() {
 
   // If they have applied before, the form opens on their answers rather than
   // empty. "Apply once" only means anything if coming back is editing.
-  let initialAnswers: Record<string, string | string[]> = {};
+  let initialAnswers: Answers = {};
   let alreadySubmitted = false;
 
   if (viewer) {
@@ -38,7 +39,7 @@ export default async function ApplicationPage() {
       .maybeSingle();
 
     if (data) {
-      initialAnswers = (data.answers ?? {}) as Record<string, string | string[]>;
+      initialAnswers = (data.answers ?? {}) as Answers;
       alreadySubmitted = data.status !== "draft";
     }
   }

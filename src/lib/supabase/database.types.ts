@@ -81,6 +81,15 @@ export type ApplicationRow = {
   reviewed_at: string | null;
   reviewed_by: string | null;
   denial_reason: string | null;
+  /** "Which dog brought you here". Null on applications made before 2026-09-12. */
+  dog_interest: "specific" | "any" | null;
+  /** Verbatim applicant input, kept even after a match so a wrong one is traceable. */
+  dog_raw: string | null;
+  /** County ID once resolved. Null with dog_interest="specific" means UNMATCHED. */
+  dog_id: DogId | null;
+  /** Null when the matcher resolved it; set when a volunteer picked. */
+  dog_matched_by: string | null;
+  dog_matched_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -189,6 +198,7 @@ export type Database = {
         | "id" | "status" | "answers" | "housing" | "landlord_ok" | "weight_limit_lb"
         | "breed_restricted" | "has_dogs" | "has_cats" | "has_kids" | "zip"
         | "submitted_at" | "reviewed_at" | "reviewed_by" | "denial_reason"
+        | "dog_interest" | "dog_raw" | "dog_id" | "dog_matched_by" | "dog_matched_at"
         | "created_at" | "updated_at"
       >;
       dog_work_status: Table<

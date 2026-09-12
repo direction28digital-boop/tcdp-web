@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { APPLY_STEPS, type Field, type Step } from "@/lib/apply-flow";
+import {
+  APPLY_STEPS,
+  type AnswerRow as Row,
+  type Answers,
+  type AnswerValue as Value,
+  type Field,
+  type Step,
+} from "@/lib/apply-flow";
 import { createClient } from "@/lib/supabase/client";
 import { saveApplication } from "@/app/application/actions";
 
@@ -31,7 +38,6 @@ export type MatchDog = {
   breed: string | null;
 };
 
-type Answers = Record<string, string | string[]>;
 
 const BREED_PATTERNS: Record<string, RegExp> = {
   "Pit bull type": /pit bull|staff|am bull|bully/i,
@@ -134,9 +140,9 @@ export function ApplicationForm({
     (step.id === "home" || step.id === "dogs") &&
     (answers.weightLimit !== undefined ||
       answers.size !== undefined ||
-      answers.breedRestrictions !== undefined);
+      answers.breedsNotAllowed !== undefined);
 
-  function set(id: string, value: string | string[]) {
+  function set(id: string, value: Value) {
     setAnswers((prev) => {
       const next = { ...prev, [id]: value };
       stash(next);
@@ -146,6 +152,38 @@ export function ApplicationForm({
 
   if (done) {
     return <Finished answers={answers} match={match} total={dogs.length} />;
+  }
+
+  // Out of state. Their form puts this in red text above the first field, which
+  // means somebody in Nevada can answer fifty questions before anyone tells
+  // them no. Say it the moment we know, and say it kindly.
+  if (answers.azResident === "No") {
+    return (
+      <div className="mx-auto max-w-[760px] px-6 py-14">
+        <div className="rounded-3xl bg-surface p-8 shadow-[0_2px_18px_rgba(17,17,17,0.07)] md:p-12">
+          <h2 className="font-display text-4xl font-extrabold text-ink">
+            We can only place dogs in Arizona
+          </h2>
+          <p className="mt-5 text-lg leading-relaxed text-ink-soft">
+            Our dogs are in Maricopa County shelters and a foster has to be close
+            enough to collect them and bring them to a vet. So we have to stop
+            here, and we are sorry, because you came to do a good thing.
+          </p>
+          <p className="mt-4 text-lg leading-relaxed text-ink-soft">
+            Two things that genuinely help from anywhere: share the dogs on our
+            Facebook pages, because a share is how most of them get found, and
+            look for a rescue working your own county list. Every city has one.
+          </p>
+          <button
+            type="button"
+            onClick={() => set("azResident", "")}
+            className="mt-8 font-semibold text-sunset underline underline-offset-4 hover:text-sunset-deep"
+          >
+            I answered that wrong
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (checkEmail) {
@@ -343,8 +381,8 @@ function FieldControl({
   onChange,
 }: {
   field: Field;
-  value: string | string[] | undefined;
-  onChange: (v: string | string[]) => void;
+  value: Value | undefined;
+  onChange: (v: Value) => void;
 }) {
   const wide = field.width !== "half";
   const base =
@@ -373,7 +411,13 @@ function FieldControl({
         </p>
       ) : null}
 
-      {field.type === "textarea" ? (
+      {field.type === "repeater" ? (
+        <RepeaterControl
+          field={field}
+          rows={Array.isArray(value) ? (value as Row[]) : []}
+          onChange={(rows) => onChange(rows)}
+        />
+      ) : field.type === "textarea" ? (
         <textarea
           id={field.id}
           rows={4}
@@ -406,7 +450,8 @@ function FieldControl({
             const selected =
               field.type === "radio"
                 ? value === option
-                : Array.isArray(value) && value.includes(option);
+                : Array.isArray(value) &&
+                  (value as string[]).includes(option);
             return (
               <button
                 key={option}
@@ -414,7 +459,9 @@ function FieldControl({
                 aria-pressed={selected}
                 onClick={() => {
                   if (field.type === "radio") return onChange(option);
-                  const current = Array.isArray(value) ? value : [];
+                  const current = (
+                    Array.isArray(value) ? value : []
+                  ) as string[];
                   onChange(
                     current.includes(option)
                       ? current.filter((v) => v !== option)
@@ -446,6 +493,111 @@ function FieldControl({
   );
 }
 
+/**
+ * A repeating group: household members, resident dogs, trips, alternate emails.
+ *
+ * Starts with ZERO rows, not one. An empty row sitting there reads as a required
+ * question and makes the form look longer than it is; "Add another person" is an
+ * invitation, a blank form is a demand.
+ *
+ * Removing a row keeps its neighbours intact by filtering on index rather than
+ * splicing state in place, which is the classic way these lose the wrong row.
+ */
+function RepeaterControl({
+  field,
+  rows,
+  onChange,
+}: {
+  field: Field;
+  rows: Row[];
+  onChange: (rows: Row[]) => void;
+}) {
+  const max = field.max ?? 10;
+  const sub = field.fields ?? [];
+
+  function update(index: number, key: string, value: string) {
+    onChange(rows.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
+  }
+
+  return (
+    <div className="mt-3">
+      {rows.length > 0 ? (
+        <ul className="space-y-4">
+          {rows.map((row, index) => (
+            <li
+              key={index}
+              className="rounded-2xl border-2 border-line bg-white p-5"
+            >
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="font-display text-sm font-bold tracking-wide text-ink-soft uppercase">
+                  {index + 1}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onChange(rows.filter((_, i) => i !== index))}
+                  className="text-sm font-semibold text-sunset underline underline-offset-4 hover:text-sunset-deep"
+                >
+                  Remove
+                </button>
+              </div>
+
+              <div className="mt-3 grid gap-5 sm:grid-cols-2">
+                {sub.map((f) => (
+                  <div key={f.id} className={f.width === "half" ? "" : "sm:col-span-2"}>
+                    <label
+                      htmlFor={`${field.id}-${index}-${f.id}`}
+                      className="block text-sm font-semibold text-ink"
+                    >
+                      {f.label}
+                    </label>
+                    {f.type === "select" || f.type === "radio" ? (
+                      <select
+                        id={`${field.id}-${index}-${f.id}`}
+                        value={row[f.id] ?? ""}
+                        onChange={(e) => update(index, f.id, e.target.value)}
+                        className="mt-1.5 w-full rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-base text-ink focus:border-sunset focus:outline-none"
+                      >
+                        <option value="">Choose one</option>
+                        {f.options?.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={`${field.id}-${index}-${f.id}`}
+                        type={f.type === "repeater" ? "text" : f.type}
+                        value={row[f.id] ?? ""}
+                        onChange={(e) => update(index, f.id, e.target.value)}
+                        className="mt-1.5 w-full rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-base text-ink focus:border-sunset focus:outline-none"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {rows.length < max ? (
+        <button
+          type="button"
+          onClick={() => onChange([...rows, {}])}
+          className="mt-3 rounded-full border-2 border-ink px-5 py-2.5 font-display text-xs font-bold tracking-wide text-ink uppercase hover:bg-ink hover:text-cream"
+        >
+          {field.addLabel ?? "Add one"}
+        </button>
+      ) : (
+        <p className="mt-3 text-sm text-ink-soft">
+          That is as many as this form takes. Put anything else in the last box.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function isVisible(field: Field, answers: Answers): boolean {
   if (!field.showWhen) return true;
   const v = answers[field.showWhen.field];
@@ -467,13 +619,13 @@ function countMatches(
     typeof answers.weightLimit === "string" ? answers.weightLimit : "";
   const limit = WEIGHT_LIMITS[limitLabel] ?? null;
 
-  const restricted = Array.isArray(answers.breedRestrictions)
-    ? answers.breedRestrictions.filter(
+  const restricted = Array.isArray(answers.breedsNotAllowed)
+    ? (answers.breedsNotAllowed as string[]).filter(
         (b) => b !== "No breed restrictions" && b !== "I am not sure yet",
       )
     : [];
 
-  const sizes = Array.isArray(answers.size) ? answers.size : [];
+  const sizes = (Array.isArray(answers.size) ? answers.size : []) as string[];
   const anySize = sizes.length === 0 || sizes.includes("Any size");
 
   let fits = 0;

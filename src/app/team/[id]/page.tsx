@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { SiteNav } from "@/components/SiteNav";
 import { requireTeam } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { APPLY_STEPS } from "@/lib/apply-flow";
+import { APPLY_STEPS, type Answers } from "@/lib/apply-flow";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
 import { StatusPill } from "@/components/team/StatusPill";
 import { ReviewPanel } from "@/components/team/ReviewPanel";
@@ -14,8 +14,6 @@ export const metadata: Metadata = {
   title: "Application",
   robots: { index: false, follow: false },
 };
-
-type Answers = Record<string, string | string[]>;
 
 export default async function ApplicationDetail({
   params,
