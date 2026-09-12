@@ -2,15 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireTeam } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
 
 const ALLOWED: ApplicationStatus[] = ["submitted", "approved", "denied", "withdrawn"];
 
 /**
- * RLS is the real boundary here: applications_team_update already requires org
- * membership, so a forged request from a signed-in applicant writes nothing.
- * requireTeam() is for the human, so a confused volunteer gets sent somewhere
+ * RLS is the real boundary here: applications_staff_update requires the team or
+ * admin role, so a forged request from a signed-in applicant — or from a
+ * volunteer — writes nothing.
+ * requireStaff() is for the human, so a confused volunteer gets sent somewhere
  * sensible instead of a permission error.
  */
 export async function setStatus(
@@ -18,7 +19,7 @@ export async function setStatus(
   status: ApplicationStatus,
   denialReason?: string,
 ): Promise<{ error: string } | void> {
-  const viewer = await requireTeam();
+  const viewer = await requireStaff();
 
   // "draft" belongs to the applicant. The team must not be able to shove an
   // application back to unfinished and make it disappear from their own queue.
@@ -51,7 +52,7 @@ export async function addNote(
   applicationId: string,
   body: string,
 ): Promise<{ error: string } | void> {
-  const viewer = await requireTeam();
+  const viewer = await requireStaff();
 
   const text = body.trim();
   if (!text) return { error: "Write something first." };

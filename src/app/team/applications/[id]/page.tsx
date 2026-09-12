@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteNav } from "@/components/SiteNav";
-import { requireTeam } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { APPLY_STEPS, type Answers } from "@/lib/apply-flow";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
@@ -20,7 +20,7 @@ export default async function ApplicationDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const viewer = await requireTeam();
+  const viewer = await requireStaff();
   const { id } = await params;
   const supabase = await createClient();
 

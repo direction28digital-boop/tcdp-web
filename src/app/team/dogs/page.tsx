@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { TeamNav } from "@/components/team/TeamNav";
-import { requireTeam } from "@/lib/auth";
+import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   daysLeftLabel,
@@ -40,7 +40,7 @@ export default async function TeamDogsPage({
 }: {
   searchParams: Promise<{ show?: string }>;
 }) {
-  const viewer = await requireTeam();
+  const viewer = await requireMember();
   const params = await searchParams;
   const supabase = await createClient();
 
@@ -152,7 +152,7 @@ export default async function TeamDogsPage({
                     <div className="min-w-0 flex-1">
                       <p className="font-display text-lg font-extrabold text-ink">
                         <Link
-                          href={`/dogs/${dog.id}`}
+                          href={`/team/dogs/${dog.id}`}
                           className="hover:underline"
                         >
                           {dog.name}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
-import { requireTeam } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
 import { StatusPill } from "@/components/team/StatusPill";
@@ -38,7 +38,7 @@ export default async function TeamPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
 }) {
-  const viewer = await requireTeam();
+  const viewer = await requireStaff();
   const params = await searchParams;
   const show = FILTERS.find((f) => f.key === params.show) ?? FILTERS[0];
   const q = (params.q ?? "").trim();

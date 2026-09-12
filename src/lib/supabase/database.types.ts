@@ -36,17 +36,25 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+/**
+ * Two questions, not one. "volunteer" is anybody trusted to film a dog and move
+ * work along; "team" adds reading applications, which carry a stranger's home
+ * address, phone number and vet reference. Keeping them separate is what lets
+ * Joann hand a login to whoever turns up at the shelter with a phone.
+ */
+export type OrgRole = "volunteer" | "team" | "admin";
+
 export type OrgMemberRow = {
   org_id: string;
   profile_id: string;
-  role: "team" | "admin";
+  role: OrgRole;
   created_at: string;
 };
 
 export type TeamInviteRow = {
   org_id: string;
   email: string;
-  role: "team" | "admin";
+  role: OrgRole;
   invited_by: string | null;
   created_at: string;
   claimed_at: string | null;
@@ -97,7 +105,10 @@ export type ApplicationRow = {
 /** What the TEAM controls. County status is never stored: it is read live from the feed. */
 export type WorkStatus =
   | "not_started"
+  /** Raw clip uploaded, still needs overlays. */
   | "filmed"
+  /** Overlays done, ready to post. */
+  | "edited"
   | "posted"
   | "hands_raised"
   | "our_pull";
@@ -109,6 +120,9 @@ export type DogWorkStatusRow = {
   partner_rescue: string | null;
   saver_profile_id: string | null;
   team_notes: string | null;
+  /** Soft lock so two volunteers do not drive to the same shelter for the same dog. */
+  claimed_by: string | null;
+  claimed_at: string | null;
   updated_by: string | null;
   updated_at: string;
 };
@@ -145,6 +159,10 @@ export type DogVideoRow = {
   size_bytes: number | null;
   uploaded_by: string | null;
   uploaded_at: string;
+  /** Where the finished post lives. Facebook hosts it; we keep the link. */
+  posted_url: string | null;
+  posted_at: string | null;
+  note: string | null;
 };
 
 export type AlertPrefsRow = {
@@ -204,6 +222,7 @@ export type Database = {
       dog_work_status: Table<
         DogWorkStatusRow,
         | "work_status" | "partner_rescue" | "saver_profile_id" | "team_notes"
+        | "claimed_by" | "claimed_at"
         | "updated_by" | "updated_at"
       >;
       dog_bio_overrides: Table<DogBioOverrideRow, "edited_by" | "edited_at">;
@@ -213,7 +232,8 @@ export type Database = {
       >;
       dog_videos: Table<
         DogVideoRow,
-        "id" | "mime_type" | "size_bytes" | "uploaded_by" | "uploaded_at"
+        | "id" | "mime_type" | "size_bytes" | "uploaded_by" | "uploaded_at"
+        | "posted_url" | "posted_at" | "note"
       >;
       alert_prefs: Table<
         AlertPrefsRow,

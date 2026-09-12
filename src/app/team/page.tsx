@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { TeamNav } from "@/components/team/TeamNav";
-import { requireTeam } from "@/lib/auth";
+import { isStaff, requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   daysLeftLabel,
@@ -44,12 +44,20 @@ function waitingSince(iso: string | null): string {
 }
 
 export default async function NeedsAttentionPage() {
-  const viewer = await requireTeam();
+  const viewer = await requireMember();
   const supabase = await createClient();
 
+  const staff = isStaff(viewer);
+
+  // A volunteer's own query against `applications` returns nothing — RLS puts
+  // it behind private.is_org_staff(). Skipping the query rather than running a
+  // doomed one keeps the page honest: they see the dog work, which is theirs,
+  // and never an empty section that reads like something is broken.
   const [{ active }, { data, error }] = await Promise.all([
     getDogs(),
-    supabase
+    !staff
+      ? Promise.resolve({ data: [] as PendingApp[], error: null })
+      : supabase
       .from("applications")
       .select(
         // Named FK: applications points at profiles twice.
@@ -155,7 +163,7 @@ export default async function NeedsAttentionPage() {
                       <div className="min-w-[200px] flex-1">
                         <p className="font-display text-lg font-extrabold text-ink">
                           <Link
-                            href={`/dogs/${dog.id}`}
+                            href={`/team/dogs/${dog.id}`}
                             className="hover:underline"
                           >
                             {dog.name}
@@ -209,7 +217,7 @@ export default async function NeedsAttentionPage() {
                     <DogThumb dog={dog} />
                     <div className="min-w-0 flex-1">
                       <p className="font-display text-lg font-extrabold text-ink">
-                        <Link href={`/dogs/${dog.id}`} className="hover:underline">
+                        <Link href={`/team/dogs/${dog.id}`} className="hover:underline">
                           {dog.name}
                         </Link>
                       </p>
