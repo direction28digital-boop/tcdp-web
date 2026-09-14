@@ -242,10 +242,10 @@ export default async function EventPage({ params }: Params) {
                   Not adopting? Not fostering?
                 </h2>
                 <p className="mt-4 text-lg leading-relaxed text-cream/85">
-                  Come anyway. If you want to support the rescues, or you just
-                  want to find out what any of this involves before you decide
-                  anything, this is the afternoon to do it. We are a fun, and
-                  yes a little crazy, bunch.
+                  This is still your afternoon. If you want to support the
+                  rescues, or you just want to find out what any of this
+                  involves before you decide anything, come and find us. We are
+                  a fun, and yes a little crazy, bunch.
                 </p>
                 <p className="mt-6 text-lg leading-relaxed text-cream/85">
                   Questions before the day?{" "}

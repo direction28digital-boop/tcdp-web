@@ -53,7 +53,7 @@ export const EVENTS: CommunityEvent[] = [
     mapUrl:
       "https://www.google.com/maps/search/?api=1&query=Chicken+N+Pickle+9475+W+Hanna+Ln+Glendale+AZ",
     intro:
-      "A community afternoon to support the valley rescues and the dogs they are pulling off the county list. Come meet the people doing the work, ask every question you have, and find out where you fit. You do not need to be ready for a dog today to be worth having there.",
+      "A community afternoon for the valley rescues and the dogs they are pulling off the county list. Come meet the people doing the work, ask every question you have, and find out where you fit. You do not need to be ready for a dog today, come anyway and support the cause.",
     highlights: [
       {
         title: "Meet rescues",
