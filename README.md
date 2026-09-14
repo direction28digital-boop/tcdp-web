@@ -14,6 +14,7 @@ with their real deadline, and routes people to the application.
 - `/dogs` searchable list of every active priority dog
 - `/dogs/[id]` a public page per dog
 - `/apply` forwards to the rescue's application form (set in `next.config.ts`)
+- `/events` community events, with a page per event that outlives the event itself
 
 ## Deliberately simple
 
@@ -48,6 +49,35 @@ npm run bios -- "path/to/AZ Pound Pups Dog Bios.md"
 ```
 
 Dogs without a bio fall back to their county facts, which is honest and still useful.
+
+## Events
+
+Events live in one file, `src/lib/events.ts`. Adding one is adding an object to `EVENTS`
+and dropping the flyer in `public/events/`. Nothing else has to be touched.
+
+They take themselves down. Every surface reads the event's `end`, so once that moment
+passes the homepage strip vanishes, `/events` stops listing it, and it moves into the
+archive at `/events/past`. Nobody has to remember on the night.
+
+- `/events` upcoming events, linked from the footer
+- `/events/[slug]` one page per event, the address to put in a Facebook post
+- `/events/past` the archive. `noindex`, not in the nav, not in the sitemap, reachable
+  only by direct link
+
+Event pages are never deleted, and that is deliberate: a flyer that has been printed and
+a Facebook post that has been shared cannot be edited afterwards, so those links have to
+keep landing somewhere. After the event the page says so plainly, drops the raffle ask
+and the calendar link, goes `noindex`, and points at the dogs instead.
+
+### Times
+
+`start` and `end` carry the `-07:00` Phoenix offset in the string. Arizona does not
+observe daylight saving, so that offset is right all year, and writing it explicitly is
+what keeps the times correct on a server that runs in UTC. Write them that way every time.
+
+Pages revalidate every 30 minutes, so a cached page could in principle show a finished
+event for a few minutes. `ExpiresAt` closes that: it hides the strip in the visitor's own
+browser the minute the end time passes.
 
 ## Language rules
 

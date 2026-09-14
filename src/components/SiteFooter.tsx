@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { SITE } from "@/lib/site";
 import { ASSETS } from "@/lib/assets";
 
@@ -70,6 +71,14 @@ export function SiteFooter() {
               DOGFOSTER.ORG
             </a>
             , takes you to the same application.
+          </p>
+          <p className="mt-4 text-sm text-cream/75">
+            <Link
+              href="/events"
+              className="font-semibold text-cream underline decoration-sunset decoration-2 underline-offset-4 hover:text-gold"
+            >
+              Community events
+            </Link>
           </p>
           <p className="mt-4 text-sm text-cream/75">
             Questions?{" "}

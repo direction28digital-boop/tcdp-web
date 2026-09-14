@@ -6,12 +6,15 @@ import { DogCard } from "@/components/DogCard";
 import { OutcomeDonut } from "@/components/Donut";
 import { SwipeHeading } from "@/components/Shapes";
 import { Hero } from "@/components/Hero";
+import { EventBanner } from "@/components/EventBanner";
 import { formatDeadline, getDogs } from "@/lib/dogs";
+import { nextEvent } from "@/lib/events";
 import { SITE } from "@/lib/site";
 import { ASSETS } from "@/lib/assets";
 
 export default async function HomePage() {
   const { active, stats } = await getDogs();
+  const event = nextEvent();
   const featured = active.slice(0, 5);
   const adoptableNow = active.filter((d) => !d.nho).length;
 
@@ -21,10 +24,20 @@ export default async function HomePage() {
       <main id="main">
         <Hero dogs={active} urgentThisWeek={stats.urgentThisWeek} />
 
+        {event ? <EventBanner event={event} /> : null}
+
         {/* ── The ask, with live outcomes ──────────────────────────────── */}
         <section className="bg-cream pb-20">
           <div className="mx-auto max-w-[1180px] px-6">
-            <div className="-mt-8 grid gap-10 rounded-3xl bg-surface p-8 pt-14 shadow-[0_12px_44px_rgba(17,17,17,0.10)] md:-mt-16 md:grid-cols-[1.15fr_1fr] md:gap-14 md:p-14 md:pt-20">
+            {/* Only one thing can overlap the hero. When an event is running that is
+                the event strip, so this card drops into normal flow underneath it. */}
+            <div
+              className={`grid gap-10 rounded-3xl bg-surface shadow-[0_12px_44px_rgba(17,17,17,0.10)] md:grid-cols-[1.15fr_1fr] md:gap-14 ${
+                event
+                  ? "mt-10 p-8 md:p-14"
+                  : "-mt-8 p-8 pt-14 md:-mt-16 md:p-14 md:pt-20"
+              }`}
+            >
               <div>
                 <h2 className="font-display text-3xl leading-tight font-extrabold text-ink md:text-4xl">
                   Behind every dog saved is someone like you.
