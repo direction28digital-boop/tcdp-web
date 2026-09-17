@@ -80,11 +80,9 @@ export function ShelterNotes({
         What the shelter wrote
       </h2>
       <p className="mt-2 max-w-2xl leading-relaxed text-ink-soft">
-        Straight from {dogName}&rsquo;s Maricopa County record, word for word —
-        all of it, including bite history and anything the shelter flagged about
-        behavior. We have not softened it and we have not added to it. You should
-        know what you are taking on before you apply, not after. Anything written
-        in our own voice is labelled as ours.
+        Everything below is {dogName}&rsquo;s Maricopa County record, in the
+        county&rsquo;s words, complete. We have not edited it or added to it.
+        Anything written in our own voice is labelled as ours.
       </p>
 
       <div className="mt-6 flex flex-col gap-3">
@@ -117,7 +115,7 @@ export function ShelterNotes({
         <p className="mt-6 text-sm leading-relaxed text-ink-soft/80">
           This is a complete copy, taken from the county&rsquo;s priority portal
           and refreshed every hour.{" "}
-          <SourceLink href={detailUrl} label="See the original" /> — though the
+          <SourceLink href={detailUrl} label="See the original" />, though the
           county takes a dog&rsquo;s page down once they leave the list, so that
           link stops working when {dogName} gets out. This page will not.
         </p>

@@ -46,11 +46,12 @@ export const config = {
   // /application is here because the page reads the session to reopen a saved
   // application, so its auth cookie has to be refreshed like any signed-in page.
   // /apply is gone: it is a redirect to /application now, not a page.
-  matcher: [
-    "/team/:path*",
-    "/me/:path*",
-    "/application/:path*",
-    "/signin",
-    "/auth/:path*",
-  ],
+  // /auth/* and /signin are deliberately ABSENT. Nobody has a session to
+  // refresh while they are in the middle of getting one, and /auth/callback
+  // needs sole ownership of the auth cookies for that request: it reads the
+  // PKCE code verifier and writes the session. A second client calling
+  // getUser() over the same request first can rewrite those cookies, which is
+  // the failure mode Supabase's own docs warn about as "users being randomly
+  // logged out".
+  matcher: ["/team/:path*", "/me/:path*", "/application/:path*"],
 };
