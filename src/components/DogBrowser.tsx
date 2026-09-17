@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DogCard } from "@/components/DogCard";
-import { hasSomeone, type Dog } from "@/lib/dogs";
+import { hasSomeone, type CardDog } from "@/lib/dogs";
 
 type Filter = "all" | "nho" | "adoptable" | "soonest";
 
@@ -13,7 +13,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "adoptable", label: "Adopt directly" },
 ];
 
-export function DogBrowser({ dogs }: { dogs: Dog[] }) {
+export function DogBrowser({ dogs }: { dogs: CardDog[] }) {
   // Counted here rather than passed in, so this component stays honest even if
   // it is ever handed a filtered list.
   const spokenFor = dogs.filter(hasSomeone).length;

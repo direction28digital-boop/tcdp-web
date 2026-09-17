@@ -6,7 +6,7 @@ import {
   formatAge,
   formatBreed,
   hasSomeone,
-  type Dog,
+  type CardDog,
 } from "@/lib/dogs";
 
 const TONE_STYLES: Record<string, string> = {
@@ -68,7 +68,7 @@ export function RouteBadge({ nho }: { nho: boolean }) {
   );
 }
 
-export function DogCard({ dog }: { dog: Dog }) {
+export function DogCard({ dog }: { dog: CardDog }) {
   const facts = [formatAge(dog.age), dog.sex, formatBreed(dog.breed)]
     .filter(Boolean)
     .join(" · ");
@@ -128,9 +128,13 @@ export function DogCard({ dog }: { dog: Dog }) {
           <p className="text-sm leading-relaxed text-ink-soft">{facts}</p>
         ) : null}
 
-        {dog.bio?.story ? (
+        {/* Only the rescue's own words appear here now. The generated story is
+            gone: it made behavioural claims in the shelter's voice, and a card is
+            the worst possible place for one, because it is read fastest and
+            trusted most. A card with no note just shows the facts. */}
+        {dog.note ? (
           <p className="line-clamp-3 text-sm leading-relaxed text-ink-soft">
-            {dog.bio.story}
+            {dog.note}
           </p>
         ) : null}
 

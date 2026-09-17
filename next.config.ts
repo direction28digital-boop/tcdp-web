@@ -1,15 +1,41 @@
 import type { NextConfig } from "next";
 
 /**
- * Where "Apply to Save" goes. This is the ONLY place to change when the rescue moves
- * the application (for example to their Jotform). Every button on the site links to
- * /apply, and /apply forwards here.
+ * Where "Apply to Save" goes. This is the ONLY line to change at cutover. Every button on
+ * the site links to /apply, and /apply forwards here, so the built-in application can be
+ * live and testable long before the public is sent to it.
+ *
+ * Interim state set 2026-09-17: the public still goes to the WordPress form, because the
+ * five volunteers have not agreed to work a new queue yet. Cutover is changing this one
+ * value to "/application".
+ *
+ * permanent: false is load-bearing, not a default. A 308 is cached by the browser
+ * indefinitely, so anybody who opened /apply during the interim would keep landing on
+ * dogfoster.org after cutover and nothing on our side could undo it.
  */
 const APPLY_URL = "https://dogfoster.org";
 
 const nextConfig: NextConfig = {
   async redirects() {
-    return [{ source: "/apply", destination: APPLY_URL, permanent: false }];
+    return [
+      { source: "/apply", destination: APPLY_URL, permanent: false },
+
+      // A sign-in code that lands on the homepage still signs the person in.
+      //
+      // Supabase redirects a verified magic link to its Site URL whenever the
+      // requested redirect is not on the allow list, and it carries the code
+      // with it. Without this the person lands on the homepage holding a valid
+      // one-time code and nothing happens, which reads as "the link is broken"
+      // at the exact moment they have proved they own their email address.
+      // Costs nothing: the homepage stays static, because this is a config
+      // redirect rather than a runtime check.
+      {
+        source: "/",
+        has: [{ type: "query", key: "code" }],
+        destination: "/auth/callback?code=:code",
+        permanent: false,
+      },
+    ];
   },
   // The share card reads its fonts off disk at runtime, so keep them in the bundle.
   outputFileTracingIncludes: {

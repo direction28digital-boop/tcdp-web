@@ -36,17 +36,25 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+/**
+ * Two questions, not one. "volunteer" is anybody trusted to film a dog and move
+ * work along; "team" adds reading applications, which carry a stranger's home
+ * address, phone number and vet reference. Keeping them separate is what lets
+ * Joann hand a login to whoever turns up at the shelter with a phone.
+ */
+export type OrgRole = "volunteer" | "team" | "admin";
+
 export type OrgMemberRow = {
   org_id: string;
   profile_id: string;
-  role: "team" | "admin";
+  role: OrgRole;
   created_at: string;
 };
 
 export type TeamInviteRow = {
   org_id: string;
   email: string;
-  role: "team" | "admin";
+  role: OrgRole;
   invited_by: string | null;
   created_at: string;
   claimed_at: string | null;
@@ -81,6 +89,15 @@ export type ApplicationRow = {
   reviewed_at: string | null;
   reviewed_by: string | null;
   denial_reason: string | null;
+  /** "Which dog brought you here". Null on applications made before 2026-09-12. */
+  dog_interest: "specific" | "any" | null;
+  /** Verbatim applicant input, kept even after a match so a wrong one is traceable. */
+  dog_raw: string | null;
+  /** County ID once resolved. Null with dog_interest="specific" means UNMATCHED. */
+  dog_id: DogId | null;
+  /** Null when the matcher resolved it; set when a volunteer picked. */
+  dog_matched_by: string | null;
+  dog_matched_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -88,7 +105,10 @@ export type ApplicationRow = {
 /** What the TEAM controls. County status is never stored: it is read live from the feed. */
 export type WorkStatus =
   | "not_started"
+  /** Raw clip uploaded, still needs overlays. */
   | "filmed"
+  /** Overlays done, ready to post. */
+  | "edited"
   | "posted"
   | "hands_raised"
   | "our_pull";
@@ -100,6 +120,9 @@ export type DogWorkStatusRow = {
   partner_rescue: string | null;
   saver_profile_id: string | null;
   team_notes: string | null;
+  /** Soft lock so two volunteers do not drive to the same shelter for the same dog. */
+  claimed_by: string | null;
+  claimed_at: string | null;
   updated_by: string | null;
   updated_at: string;
 };
@@ -136,6 +159,12 @@ export type DogVideoRow = {
   size_bytes: number | null;
   uploaded_by: string | null;
   uploaded_at: string;
+  /** Where the finished post lives. Facebook hosts it; we keep the link. */
+  posted_url: string | null;
+  posted_at: string | null;
+  note: string | null;
+  /** Uploader says this clip already has overlays burned in. Skips the edit step. */
+  has_overlays: boolean;
 };
 
 export type AlertPrefsRow = {
@@ -156,6 +185,15 @@ export type AlertLogRow = {
   dog_id: DogId;
   kind: "deadline" | "weekly" | "hand_approved" | "hand_denied";
   sent_at: string;
+};
+
+export type ApplicationNoteRow = {
+  id: string;
+  org_id: string;
+  application_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
 };
 
 type Table<Row, Optional extends keyof Row = never> = {
@@ -180,11 +218,13 @@ export type Database = {
         | "id" | "status" | "answers" | "housing" | "landlord_ok" | "weight_limit_lb"
         | "breed_restricted" | "has_dogs" | "has_cats" | "has_kids" | "zip"
         | "submitted_at" | "reviewed_at" | "reviewed_by" | "denial_reason"
+        | "dog_interest" | "dog_raw" | "dog_id" | "dog_matched_by" | "dog_matched_at"
         | "created_at" | "updated_at"
       >;
       dog_work_status: Table<
         DogWorkStatusRow,
         | "work_status" | "partner_rescue" | "saver_profile_id" | "team_notes"
+        | "claimed_by" | "claimed_at"
         | "updated_by" | "updated_at"
       >;
       dog_bio_overrides: Table<DogBioOverrideRow, "edited_by" | "edited_at">;
@@ -194,7 +234,8 @@ export type Database = {
       >;
       dog_videos: Table<
         DogVideoRow,
-        "id" | "mime_type" | "size_bytes" | "uploaded_by" | "uploaded_at"
+        | "id" | "mime_type" | "size_bytes" | "uploaded_by" | "uploaded_at"
+        | "posted_url" | "posted_at" | "note" | "has_overlays"
       >;
       alert_prefs: Table<
         AlertPrefsRow,
@@ -202,6 +243,7 @@ export type Database = {
         | "paused" | "updated_at"
       >;
       alert_log: Table<AlertLogRow, "id" | "sent_at">;
+      application_notes: Table<ApplicationNoteRow, "id" | "author_id" | "created_at">;
     };
     Views: Record<never, never>;
     Functions: Record<never, never>;

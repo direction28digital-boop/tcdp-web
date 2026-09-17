@@ -7,7 +7,8 @@ import { OutcomeDonut } from "@/components/Donut";
 import { SwipeHeading } from "@/components/Shapes";
 import { Hero } from "@/components/Hero";
 import { EventBanner } from "@/components/EventBanner";
-import { formatDeadline, getDogs } from "@/lib/dogs";
+import { formatDeadline, getDogs, toCardDog } from "@/lib/dogs";
+import { getSiteNotes } from "@/lib/dog-notes.server";
 import { nextEvent } from "@/lib/events";
 import { SITE } from "@/lib/site";
 import { ASSETS } from "@/lib/assets";
@@ -15,7 +16,8 @@ import { ASSETS } from "@/lib/assets";
 export default async function HomePage() {
   const { active, stats } = await getDogs();
   const event = nextEvent();
-  const featured = active.slice(0, 5);
+  const notes = await getSiteNotes();
+  const featured = active.slice(0, 5).map((dog) => toCardDog(dog, notes.get(dog.id)));
   const adoptableNow = active.filter((d) => !d.nho).length;
 
   return (

@@ -53,7 +53,8 @@ export const SITE = {
   audienceName: "AZ Pound Pups",
   /**
    * Every CTA links here. /apply is a redirect defined in next.config.ts, which is the
-   * one place to change when the rescue moves their application form.
+   * one place to change when the application moves. It points at dogfoster.org until
+   * cutover, then at /application on this site.
    */
   applyUrl: "/apply",
   applyLabel: "Apply to Save a Dog",

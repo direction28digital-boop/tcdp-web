@@ -3,7 +3,8 @@ import { SiteNav } from "@/components/SiteNav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { DogBrowser } from "@/components/DogBrowser";
 import { SwipeHeading, TornEdge } from "@/components/Shapes";
-import { formatDeadline, getDogs } from "@/lib/dogs";
+import { formatDeadline, getDogs, toCardDog } from "@/lib/dogs";
+import { getSiteNotes } from "@/lib/dog-notes.server";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -14,17 +15,15 @@ export const metadata: Metadata = {
 
 export default async function DogsPage() {
   const { active, stats, fetchedAt, live } = await getDogs();
+  const notes = await getSiteNotes();
 
   /**
-   * DogBrowser is a client component, so everything handed to it is serialised into the
-   * page for the browser to download. Cards only ever show the bio's first lines, so the
-   * bullets and the needs paragraph are dropped here. Most of this audience is on a phone.
-   * The full bio still renders on each dog's own page.
+   * DogBrowser is a client component, so everything handed to it is serialised
+   * into the page for the browser to download. toCardDog drops the county record
+   * — 8 to 16KB per dog — and keeps only what a card shows. The full record
+   * renders on each dog's own page, where somebody asked for it.
    */
-  const forList = active.map((dog) => ({
-    ...dog,
-    bio: dog.bio ? { ...dog.bio, bullets: [], needs: "" } : null,
-  }));
+  const forList = active.map((dog) => toCardDog(dog, notes.get(dog.id)));
 
   return (
     <>
