@@ -108,6 +108,7 @@ function VideoRow({ dogId, video }: { dogId: string; video: VideoItem }) {
             className="text-sm font-semibold text-sunset underline underline-offset-4"
           >
             See the post
+            <span className="sr-only"> (opens Facebook in a new tab)</span>
           </a>
         ) : null}
       </div>

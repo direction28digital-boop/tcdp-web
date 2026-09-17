@@ -39,9 +39,12 @@ export function SiteFooter() {
                 {page.url ? (
                   <a
                     href={page.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="font-semibold text-cream underline decoration-sunset decoration-2 underline-offset-4 hover:text-gold"
                   >
                     {page.name}
+                    <span className="sr-only"> (opens Facebook in a new tab)</span>
                   </a>
                 ) : (
                   <span className="font-semibold text-cream">{page.name}</span>

@@ -120,6 +120,10 @@ export function DogDisclosurePanel({
             >
               Read the whole record on the county&rsquo;s page
               <span aria-hidden="true"> →</span>
+              <span className="sr-only">
+                {" "}
+                (opens the county website in a new tab)
+              </span>
             </a>
           </p>
         ) : null}
