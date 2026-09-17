@@ -32,8 +32,11 @@ export function SignInForm() {
     setState("sending");
 
     const supabase = createClient();
+    // ALWAYS set next, even when it is just the default. The auth email
+    // template appends token_hash with "&", so emailRedirectTo has to arrive
+    // already carrying a query string or the link comes out malformed.
     const callback = new URL("/auth/callback", window.location.origin);
-    if (next) callback.searchParams.set("next", next);
+    callback.searchParams.set("next", next || "/me");
 
     const { error: sendError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
