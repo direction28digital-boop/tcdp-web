@@ -23,11 +23,11 @@ export const SITE = {
   shortName: "TCDP",
   audienceName: "AZ Pound Pups",
   /**
-   * Every CTA links here. This is a real page on this site now (decided 2026-09-10):
-   * dogfoster.org redirects to thecrazydogpeople.com/application, so the application
-   * lives at one address that the rescue controls and Dee maintains.
+   * Every CTA links here. /apply is a redirect defined in next.config.ts, which is the
+   * one place to change when the application moves. It points at dogfoster.org until
+   * cutover, then at /application on this site.
    */
-  applyUrl: "/application",
+  applyUrl: "/apply",
   applyLabel: "Apply to Save a Dog",
   phone: "602-834-4911",
   phoneHref: "tel:+16028344911",

@@ -1,18 +1,24 @@
 import type { NextConfig } from "next";
 
 /**
- * The application lives at /application on this site (decided 2026-09-10). dogfoster.org
- * redirects here at the registrar, so the old address keeps working forever and the
- * WordPress install behind it can be switched off.
+ * Where "Apply to Save" goes. This is the ONLY line to change at cutover. Every button on
+ * the site links to /apply, and /apply forwards here, so the built-in application can be
+ * live and testable long before the public is sent to it.
  *
- * /apply stays as a permanent alias because it is printed on flyers and pasted into
- * Facebook posts that nobody can go back and edit.
+ * Interim state set 2026-09-17: the public still goes to the WordPress form, because the
+ * five volunteers have not agreed to work a new queue yet. Cutover is changing this one
+ * value to "/application".
+ *
+ * permanent: false is load-bearing, not a default. A 308 is cached by the browser
+ * indefinitely, so anybody who opened /apply during the interim would keep landing on
+ * dogfoster.org after cutover and nothing on our side could undo it.
  */
+const APPLY_URL = "https://dogfoster.org";
 
 const nextConfig: NextConfig = {
   async redirects() {
     return [
-      { source: "/apply", destination: "/application", permanent: true },
+      { source: "/apply", destination: APPLY_URL, permanent: false },
 
       // A sign-in code that lands on the homepage still signs the person in.
       //
