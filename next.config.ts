@@ -1,24 +1,20 @@
 import type { NextConfig } from "next";
+import { APPLY_DESTINATION } from "./src/lib/site";
 
 /**
- * Where "Apply to Save" goes. This is the ONLY line to change at cutover. Every button on
- * the site links to /apply, and /apply forwards here, so the built-in application can be
- * live and testable long before the public is sent to it.
- *
- * Interim state set 2026-09-17: the public still goes to the WordPress form, because the
- * five volunteers have not agreed to work a new queue yet. Cutover is changing this one
- * value to "/application".
+ * Where "Apply to Save" goes. The value lives in src/lib/site.ts as
+ * APPLY_DESTINATION, so the cutover is one edit in one file and the UI flag
+ * that depends on it cannot drift out of step.
  *
  * permanent: false is load-bearing, not a default. A 308 is cached by the browser
  * indefinitely, so anybody who opened /apply during the interim would keep landing on
  * dogfoster.org after cutover and nothing on our side could undo it.
  */
-const APPLY_URL = "https://dogfoster.org";
 
 const nextConfig: NextConfig = {
   async redirects() {
     return [
-      { source: "/apply", destination: APPLY_URL, permanent: false },
+      { source: "/apply", destination: APPLY_DESTINATION, permanent: false },
 
       // A sign-in code that lands on the homepage still signs the person in.
       //

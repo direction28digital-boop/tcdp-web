@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { SITE } from "@/lib/site";
+import { APPLICATION_IS_OURS, SITE } from "@/lib/site";
 import { ASSETS } from "@/lib/assets";
 
 export function SiteFooter() {
@@ -75,6 +75,26 @@ export function SiteFooter() {
             </a>
             , takes you to the same application.
           </p>
+          {/* The way back in. Until this existed, the only sign-in link on the
+              whole site said "Team sign in", which tells an applicant the box
+              is not for them. "Apply once and come back to edit" was real in
+              the code and invisible on the site.
+
+              Hidden while the public is still applying on WordPress: inviting
+              someone to sign in to an application they never made here is a
+              dead end with our name on it. */}
+          {APPLICATION_IS_OURS ? (
+            <p className="mt-5 text-sm leading-relaxed text-cream/75">
+              Applied already?{" "}
+              <Link
+                href="/signin?next=/application"
+                className="font-semibold text-cream underline decoration-sunset decoration-2 underline-offset-4 hover:text-gold"
+              >
+                Sign in to update it
+              </Link>
+              . We email you a link, no password.
+            </p>
+          ) : null}
           <p className="mt-4 text-sm text-cream/75">
             <Link
               href="/events"

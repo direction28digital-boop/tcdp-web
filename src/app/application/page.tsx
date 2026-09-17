@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SwipeHeading, TornEdge } from "@/components/Shapes";
@@ -67,6 +68,24 @@ export default async function ApplicationPage() {
               No password to make. Put your email in the first step and we send
               you a link at the end.
             </p>
+            {/* Without this, somebody who applied last month lands on an empty
+                form and starts over. The answers are sitting there, but the
+                page only reopens them for a signed-in viewer, and nothing on
+                the page said so. Retyping 65 fields is exactly the marathon
+                this application exists to end. */}
+            {viewer ? null : (
+              <p className="mt-6 rounded-2xl bg-sage-soft/60 p-5 leading-relaxed text-sage">
+                Applied before?{" "}
+                <Link
+                  href="/signin?next=/application"
+                  className="font-semibold underline underline-offset-4"
+                >
+                  Sign in first
+                </Link>{" "}
+                and we will open your answers where you left them, so you are
+                editing rather than starting over.
+              </p>
+            )}
           </div>
         </section>
 

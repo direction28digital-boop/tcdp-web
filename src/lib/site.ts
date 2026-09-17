@@ -19,6 +19,30 @@ export const BASE_URL =
     : "http://localhost:3000");
 
 /**
+ * ⭐ THE CUTOVER SWITCH. Change this one value and nothing else.
+ *
+ * Every button on the site links to /apply, and next.config.ts forwards /apply
+ * here, so the built-in application can be live and testable long before the
+ * public is sent to it.
+ *
+ * Today it points at the WordPress form, because the five volunteers have not
+ * agreed to work a new queue yet. At cutover it becomes "/application".
+ *
+ * Deriving the flag below from the same value is the point: a half-flipped
+ * cutover, where the buttons move but the site still hides the way back into a
+ * saved application, is exactly the kind of thing nobody notices for a week.
+ */
+export const APPLY_DESTINATION = "https://dogfoster.org";
+
+/**
+ * True once the application on this site is the real one. Gates anything that
+ * only makes sense when people applied HERE, such as signing back in to edit a
+ * saved application. While the public is on WordPress, inviting them to sign in
+ * to an application they never made here is a dead end with our name on it.
+ */
+export const APPLICATION_IS_OURS = APPLY_DESTINATION.startsWith("/");
+
+/**
  * The three real pages, confirmed by Dee 2026-09-14. Two of them have no vanity handle
  * yet and so are profile.php links; if Facebook ever gives them usernames, swap the URL
  * here and nothing else changes.
